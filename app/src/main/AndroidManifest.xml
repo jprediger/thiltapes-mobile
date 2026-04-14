@@ -17,10 +17,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Thiltapes">
         <activity
-            android:name=".MapaJogoActivity"
+            android:name=".ListaJogosActivity"
             android:exported="false" />
         <activity
-            android:name=".InicioActivity"
+            android:name=".SelecaoModoActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -28,6 +28,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".MapaJogoActivity"
+            android:exported="false" />
     </application>
 
 </manifest>
