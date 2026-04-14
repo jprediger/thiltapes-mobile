@@ -10,6 +10,8 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -23,6 +25,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import org.maplibre.android.MapLibre;
 import org.maplibre.android.geometry.LatLng;
@@ -38,6 +42,10 @@ import org.maplibre.android.style.expressions.Expression;
 import org.maplibre.android.style.layers.FillExtrusionLayer;
 import org.maplibre.android.style.layers.PropertyFactory;
 
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+
+import java.util.ArrayList;
+
 /**
  * Mapa em tela cheia com seguimento da posição do dispositivo e amostragem da localização
  * para lógica de jogo (limiar espacial antes de notificar).
@@ -50,6 +58,14 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
     private static final float DISTANCIA_MINIMA_METROS = 5f;
 
     private static final String TAG = MapaJogoActivity.class.getSimpleName();
+
+    /** Placeholder de rede para mock até integração com API. */
+    private static final String URL_MOCK_THILTAPE = "https://unsplash.it/1024/1024";
+
+    /** Distâncias fixas (m) para cada item da lista mock. */
+    private static final float[] DISTANCIAS_MOCK_METROS = {
+            5f, 10f, 20f, 50f, 70f, 90f, 110f, 150f, 210f, 300f, 400f
+    };
 
     private MapView mapView;
     private @Nullable MapLibreMap map;
@@ -88,9 +104,70 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
-        mapView = findViewById(R.id.mapView);
+        mapView = findViewById(R.id.map_view);
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(this::aoMapaPronto);
+
+        configurarPainelThiltapes();
+    }
+
+    /**
+     * Bottom sheet com grade de thiltapes próximos (mock), handle para expandir e lista vazia tratada.
+     */
+    private void configurarPainelThiltapes() {
+        View sheet = findViewById(R.id.sheet_thiltapes);
+        RecyclerView recycler = findViewById(R.id.recycler_thiltapes);
+        TextView textoVazio = findViewById(R.id.texto_lista_vazia_thiltapes);
+        View handle = findViewById(R.id.handle_thiltapes);
+
+        BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(sheet);
+        // Sempre visível: só colapsado (primeira linha) ou expandido (tela cheia); nunca arrastar para fora.
+        behavior.setHideable(false);
+        behavior.setFitToContents(false);
+        behavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+        behavior.addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
+            @Override
+            public void onStateChanged(@NonNull View bottomSheet, int newState) {
+                if (newState == BottomSheetBehavior.STATE_HIDDEN) {
+                    behavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                }
+            }
+
+            @Override
+            public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+            }
+        });
+
+        handle.setOnClickListener(v -> {
+            int state = behavior.getState();
+            if (state == BottomSheetBehavior.STATE_EXPANDED) {
+                behavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+            } else {
+                behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+            }
+        });
+
+        ArrayList<ThiltapeProximo> lista = gerarListaMockThiltapes();
+        if (lista.isEmpty()) {
+            recycler.setVisibility(View.GONE);
+            textoVazio.setVisibility(View.VISIBLE);
+        } else {
+            recycler.setVisibility(View.VISIBLE);
+            textoVazio.setVisibility(View.GONE);
+            recycler.setLayoutManager(new GridLayoutManager(this, 4));
+            ImagemMapaAdapter adapter = new ImagemMapaAdapter(lista,
+                    (item, posicao) -> ThiltapeFullscreenDialog.mostrar(MapaJogoActivity.this, item, posicao));
+            recycler.setAdapter(adapter);
+        }
+    }
+
+    /** Lista fixa de thiltapes mock (mesma URL) com distâncias em metros para testar máscara e saturação. */
+    private ArrayList<ThiltapeProximo> gerarListaMockThiltapes() {
+        ArrayList<ThiltapeProximo> lista = new ArrayList<>();
+        for (float metros : DISTANCIAS_MOCK_METROS) {
+            lista.add(new ThiltapeProximo(URL_MOCK_THILTAPE, false, metros));
+        }
+        return lista;
     }
 
     /** Configura estilo, prédios 3D e fluxo de permissão após o mapa estar pronto. */
@@ -264,6 +341,7 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        ThiltapesCacheBitmapLru.limpar();
         mapView.onDestroy();
     }
 }
