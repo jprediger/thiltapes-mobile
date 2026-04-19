@@ -19,6 +19,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // PhotoView (com.github.chrisbanes:PhotoView) é publicado via JitPack, não no Maven Central.
+        maven {
+            url = uri("https://jitpack.io")
+        }
     }
 }
 

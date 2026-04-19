@@ -3,4 +3,7 @@
     <string name="action_abrir_mapa_jogo">Abrir mapa do jogo</string>
     <string name="msg_permissao_local_negada">Permissão de localização negada.</string>
     <string name="msg_ativar_gps">Ative o GPS para usar o mapa.</string>
+    <string name="msg_nenhum_thiltape_proximo">Nenhum thiltape por aqui…</string>
+    <string name="fechar">Fechar</string>
 </resources>
+
