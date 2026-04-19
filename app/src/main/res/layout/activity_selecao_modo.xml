@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#02332A"
+    tools:context=".SelecaoModoActivity">
+
+    <TextView
+        android:id="@+id/txt_titulo_lista"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="50dp"
+        android:fontFamily="sans-serif-black"
+        android:text="Caça ao\nThiltapes"
+        android:textAlignment="center"
+        android:textColor="#F8BA8C"
+        android:textSize="48sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <Button
+        android:id="@+id/btn_jogar"
+        android:layout_width="300dp"
+        android:layout_height="80dp"
+        android:layout_marginTop="150dp"
+        android:backgroundTint="#33691E"
+        android:fontFamily="sans-serif-black"
+        android:text="Entrar em uma Partida"
+        android:textColor="#FFFFFF"
+        android:textColorLink="#D51818"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/txt_titulo_lista" />
+
+    <Button
+        android:id="@+id/btn_criar"
+        android:layout_width="300dp"
+        android:layout_height="80dp"
+        android:layout_marginTop="60dp"
+        android:backgroundTint="#4E3333"
+        android:fontFamily="sans-serif-black"
+        android:text="Criar Partida"
+        android:textColor="#FFFFFF"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/btn_jogar" />
+</androidx.constraintlayout.widget.ConstraintLayout>
