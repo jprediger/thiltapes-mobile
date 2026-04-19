@@ -24,6 +24,6 @@ public class SelecaoModoActivity extends AppCompatActivity {
         btnCriar = (Button) (findViewById(R.id.btn_criar));
 
         btnJogar.setOnClickListener(v -> startActivity(new Intent(this, ListaJogosActivity.class)));
-        //btnCriar.setOnClickListener(v -> startActivity(new Intent(this, ------.class)));  Chamar a activity de novo jogo
+        btnCriar.setOnClickListener(v -> startActivity(new Intent(this, InicioActivity.class)));
     }
 }
