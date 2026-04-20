@@ -1,9 +1,41 @@
 <resources>
     <string name="app_name">Thiltapes</string>
+    <string name="hint_nome_usuario">Digite seu nome</string>
+    <string name="btn_mapa_jogo">Buscar Jogos</string>
+    <string name="btn_inventario">Inventário</string>
+    <string name="btn_gerenciar_jogos">Meus Jogos</string>
+    <string name="titulo_inicio_app">Caça ao\nThiltapes</string>
+    <string name="msg_api_url_padrao">Defina THILTAPES_API_BASE_URL em local.properties; usando URL padrao de desenvolvimento.</string>
+    <string name="msg_erro_rede">Falha de rede ou servidor.</string>
+    <string name="msg_erro_parse">Resposta invalida do servidor.</string>
+    <string name="msg_nome_obrigatorio_patch">Nome nao pode ficar vazio para sincronizar.</string>
     <string name="action_abrir_mapa_jogo">Abrir mapa do jogo</string>
     <string name="msg_permissao_local_negada">Permissão de localização negada.</string>
     <string name="msg_ativar_gps">Ative o GPS para usar o mapa.</string>
     <string name="msg_nenhum_thiltape_proximo">Nenhum thiltape por aqui…</string>
     <string name="fechar">Fechar</string>
+    <string name="btn_inventario_jogo_atual">Inventario deste jogo</string>
+    <string name="pontuacao_jogo_format">Pontuacao: %1$d</string>
+    <string name="btn_novo_jogo">Novo jogo</string>
+    <string name="hint_nome_jogo">Nome do jogo</string>
+    <string name="salvar">Salvar</string>
+    <string name="excluir_jogo">Excluir jogo</string>
+    <string name="adicionar_thiltape">Adicionar thiltape</string>
+    <string name="titulo_gerenciar_jogos">Meus jogos</string>
+    <string name="msg_inventario_vazio">Nada no inventario ainda.</string>
+    <string name="titulo_thiltape_linha">Thiltape</string>
+    <string name="hint_nome_thiltape">Nome</string>
+    <string name="hint_pontos">Pontuacao</string>
+    <string name="hint_lat">Latitude</string>
+    <string name="hint_lng">Longitude</string>
+    <string name="btn_foto">Foto</string>
+    <string name="btn_usar_gps">GPS</string>
+    <string name="hint_preview">Preview</string>
+    <string name="remover_linha">Remover</string>
+    <string name="msg_preencha_nome_jogo">Informe o nome do jogo.</string>
+    <string name="msg_salvo">Salvo.</string>
+    <string name="msg_thiltape_incompleto">Preencha nome, pontos, coordenadas e foto nos thiltapes novos.</string>
+    <string name="msg_sem_gps">Nao foi possivel obter a ultima posicao; tente de novo ao ar livre.</string>
+    <string name="msg_jogo_invalido">Selecione um jogo valido na lista.</string>
 </resources>
 

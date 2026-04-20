@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="tag_bind_posicao_thiltape" type="id" />
+    <item name="tag_thiltape_server_id" type="id" />
+    <item name="tag_thiltape_bitmap" type="id" />
+    <item name="tag_thiltape_img_origem" type="id" />
 </resources>

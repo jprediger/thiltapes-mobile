@@ -60,4 +60,34 @@
                 android:visibility="gone" />
         </FrameLayout>
     </LinearLayout>
+
+    <!-- Inventário do jogo: acima da área mínima do bottom sheet (sheet recolhido). -->
+    <LinearLayout
+        android:id="@+id/container_inventario_mapa"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="@dimen/inventario_botao_margin_bottom"
+        android:elevation="10dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/texto_pontuacao_jogo_mapa"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:shadowColor="#CC000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="4"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/btn_inventario_jogo_mapa"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_inventario_jogo_atual" />
+    </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

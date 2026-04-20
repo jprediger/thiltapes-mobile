@@ -43,10 +43,10 @@ public final class ThiltapesImagemConstantes {
     public static final long LIMITE_BYTES_TOTAL_CACHE_MEMORIA_GLIDE = 16 * 1024 * 1024L;
 
     /**
-     * Decode Glide único para lista e tela cheia: mesmo {@code override} + {@code centerCrop}, para o bitmap
-     * base coincidir e o overlay (saturação/pixelização) ser idêntico.
+     * Teto (px) para decode em lista e tela cheia; itens {@link ThiltapeProximo#isDesbloqueado() desbloqueados}
+     * usam {@code fitCenter} (sem recorte); bloqueados no mapa usam {@code centerCrop} com o mesmo teto.
      *
-     * @see <a href="https://bumptech.github.io/glide/doc/resizing.html">Glide — Resizing</a>
+     * @see <a href="https://bumptech.github.io/glide/doc/resizing.html">Glide - Resizing</a>
      */
     public static final int CARREGAMENTO_THILTAPE_LADO_PX = 512;
 }

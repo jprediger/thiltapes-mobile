@@ -14,15 +14,15 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.RequestBuilder;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.bumptech.glide.request.RequestOptions;
+import com.bumptech.glide.load.model.GlideUrl;
+import com.bumptech.glide.load.model.LazyHeaders;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.github.chrisbanes.photoview.PhotoView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 /**
- * Diálogo em tela cheia com zoom/pan; overlay permanece alinhado à imagem (bitmap composto).
+ * Dialogo em tela cheia com zoom/pan; apenas thiltapes ainda bloqueados no mapa recebem overlay no bitmap.
  */
 public final class ThiltapeFullscreenDialog {
 
@@ -55,18 +55,15 @@ public final class ThiltapeFullscreenDialog {
         fechar.setOnClickListener(v -> dialog.dismiss());
 
         dialog.show();
-
-        // centerCrop + quadrado como na lista: mesma região da foto; o overlay usa o mesmo N e (row,col).
-        RequestOptions opts = new RequestOptions()
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .skipMemoryCache(true)
-                .override(
-                        ThiltapesImagemConstantes.CARREGAMENTO_THILTAPE_LADO_PX,
-                        ThiltapesImagemConstantes.CARREGAMENTO_THILTAPE_LADO_PX)
-                .centerCrop();
+        ThiltapesBarraSistema.aplicarNoDialogo(dialog, R.id.root_thiltape_fullscreen);
 
         RequestBuilder<Bitmap> rb = Glide.with(activity).asBitmap();
-        if (item.isEhBase64()) {
+        if (item.isImagemRequerAuthBasica()) {
+            LazyHeaders headers = new LazyHeaders.Builder()
+                    .addHeader("Authorization", ThiltapesSessao.de(activity).obterCabeçalhoAuthorization())
+                    .build();
+            rb = rb.load(new GlideUrl(item.getFonte(), headers));
+        } else if (item.isEhBase64()) {
             if (ThiltapesBase64Util.excedeLimiteArquivo(item.getFonte())) {
                 dialog.dismiss();
                 return;
@@ -82,7 +79,7 @@ public final class ThiltapeFullscreenDialog {
             rb = rb.load(item.getFonte());
         }
 
-        rb.apply(opts).into(new CustomTarget<Bitmap>(
+        rb.apply(ThiltapesGlideOpcoesCarregamento.opcoesListaOuFullscreen(item)).into(new CustomTarget<Bitmap>(
                 ThiltapesImagemConstantes.CARREGAMENTO_THILTAPE_LADO_PX,
                 ThiltapesImagemConstantes.CARREGAMENTO_THILTAPE_LADO_PX) {
             @Override
@@ -96,9 +93,20 @@ public final class ThiltapeFullscreenDialog {
                         || resource.getHeight() > ThiltapesImagemConstantes.LIMITE_DIMENSAO_MAXIMA_POR_LADO_PX) {
                     return;
                 }
-                Bitmap composto = GeradorOverlayThiltape.criarFullscreenComposto(
-                        resource,
-                        item.getDistanciaMetros());
+                Bitmap composto;
+                if (item.isDesbloqueado()) {
+                    composto = Bitmap.createBitmap(
+                            resource.getWidth(),
+                            resource.getHeight(),
+                            Bitmap.Config.ARGB_8888
+                    );
+                    android.graphics.Canvas canvas = new android.graphics.Canvas(composto);
+                    canvas.drawBitmap(resource, 0f, 0f, null);
+                } else {
+                    composto = GeradorOverlayThiltape.criarFullscreenComposto(
+                            resource,
+                            item.getDistanciaMetros());
+                }
                 photoView.setImageBitmap(composto);
             }
 

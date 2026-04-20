@@ -1,27 +1,32 @@
 package br.univates.mobile.thiltapes;
 
+import androidx.annotation.NonNull;
+
+/**
+ * Item de lista de jogo ({@code GET /jogos}): id e nome.
+ */
 public class ItemListaJogos {
-    private String titulo, criador, id = null;
 
-    public ItemListaJogos(String titulo, String criador, String id) {
-        this.titulo = titulo;
-        this.criador = criador;
+    private final int id;
+    @NonNull
+    private final String nome;
+
+    public ItemListaJogos(int id, @NonNull String nome) {
         this.id = id;
+        this.nome = nome;
     }
 
-    public String getTitulo() {
-        return titulo;
-    }
-
-    public String getCriador() {
-        return criador;
-    }
-
-    public String getId() {
+    public int getId() {
         return id;
     }
 
+    @NonNull
+    public String getNome() {
+        return nome;
+    }
+
+    @NonNull
     public String getDescricao() {
-        return String.format("%s ▸ %s", this.criador, this.id);
+        return "ID " + id;
     }
 }

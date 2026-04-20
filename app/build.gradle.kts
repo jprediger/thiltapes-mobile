@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
 }
@@ -10,6 +12,10 @@ android {
         }
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "br.univates.mobile.thiltapes"
         minSdk = 32
@@ -18,6 +24,24 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val propsLocais = Properties()
+        val arquivoLocalProps = rootProject.file("local.properties")
+        if (arquivoLocalProps.exists()) {
+            arquivoLocalProps.inputStream().use { propsLocais.load(it) }
+        }
+        val urlDeclarada = propsLocais.getProperty("THILTAPES_API_BASE_URL")?.trim().orEmpty()
+        val urlEfetiva = if (urlDeclarada.isNotEmpty()) {
+            urlDeclarada.trimEnd('/')
+        } else {
+            "http://192.168.0.106:3000"
+        }
+        buildConfigField("String", "API_BASE_URL", "\"$urlEfetiva\"")
+        buildConfigField(
+            "boolean",
+            "API_BASE_URL_DEFINIDA_EM_LOCAL_PROPERTIES",
+            "${urlDeclarada.isNotEmpty()}"
+        )
     }
 
     buildTypes {
@@ -50,4 +74,6 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
 
     implementation(libs.maplibre.android)
+    implementation(libs.volley)
+    implementation(libs.gson)
 }

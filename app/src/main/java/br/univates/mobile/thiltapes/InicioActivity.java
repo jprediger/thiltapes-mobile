@@ -1,88 +1,121 @@
 package br.univates.mobile.thiltapes;
 
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.provider.Settings;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
+
+import com.android.volley.VolleyError;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
- * Tela inicial do app: gerencia identificação do usuário e navegação.
+ * Tela inicial (design da antiga selecao de modo): nome de usuario, botoes; {@code GET/PATCH /me}.
  */
 public class InicioActivity extends AppCompatActivity {
 
     private EditText etNomeUsuario;
-    private SharedPreferences prefs;
+    private Button btnEscolherJogo;
+    private Button btnInventario;
+    private Button btnGerenciar;
+
+    private String ultimoNomeEnviado = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // Força o modo claro para evitar problemas de visibilidade
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.activity_inicio);
+        ThiltapesBarraSistema.aplicarNaRaiz(this, R.id.activity_inicio);
 
-        // Configuração para preencher o espaço da barra de status (Edge-to-Edge)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.activity_inicio), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
-
-        // 1. Inicializar componentes
-        etNomeUsuario = findViewById(R.id.et_nome_usuario);
-        Button btnMapa = findViewById(R.id.btn_abrir_mapa);
-        Button btnCadastro = findViewById(R.id.btn_abrir_inventario); // Usando o ID do botão de inventário para o cadastro
-
-        // 2. Configurar SharedPreferences (Persistência local)
-        prefs = getSharedPreferences("Thiltapes_Prefs", Context.MODE_PRIVATE);
-
-        // Autopreencher o nome se já foi salvo anteriormente
-        String nomeSalvo = prefs.getString("user_name", "");
-        if (etNomeUsuario != null) {
-            etNomeUsuario.setText(nomeSalvo);
+        if (!BuildConfig.API_BASE_URL_DEFINIDA_EM_LOCAL_PROPERTIES) {
+            Toast.makeText(
+                    this,
+                    R.string.msg_api_url_padrao,
+                    Toast.LENGTH_LONG
+            ).show();
         }
 
-        // 3. Capturar o ANDROID_ID (Identificador único do dispositivo)
-        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        etNomeUsuario = findViewById(R.id.et_nome_usuario);
+        btnEscolherJogo = findViewById(R.id.btn_abrir_mapa);
+        btnInventario = findViewById(R.id.btn_inventario);
+        btnGerenciar = findViewById(R.id.btn_gerenciar_jogos);
 
-        // 4. Clique para abrir o MAPA (Fluxo do Jogador)
-        btnMapa.setOnClickListener(v -> {
-            String nome = etNomeUsuario.getText().toString().trim();
-            if (!nome.isEmpty()) {
-                salvarNome(nome);
+        ThiltapesSessao sessao = ThiltapesSessao.de(this);
+        etNomeUsuario.setText(sessao.obterNomeLocal());
+        ultimoNomeEnviado = sessao.obterNomeLocal();
 
-                Intent intent = new Intent(this, MapaJogoActivity.class);
-                intent.putExtra("NOME_USUARIO", nome);
-                intent.putExtra("ANDROID_ID", androidId);
-                startActivity(intent);
-            } else {
-                etNomeUsuario.setError("Por favor, digite seu nome");
-            }
-        });
+        btnEscolherJogo.setOnClickListener(v ->
+                navegarAposSincronizarNome(new Intent(this, ListaJogosActivity.class)));
+        btnInventario.setOnClickListener(v ->
+                navegarAposSincronizarNome(new Intent(this, InventarioActivity.class)));
+        btnGerenciar.setOnClickListener(v ->
+                navegarAposSincronizarNome(new Intent(this, GerenciarJogosActivity.class)));
 
-        // 5. Clique para abrir o CADASTRO (Sua implementação)
-        btnCadastro.setOnClickListener(v -> {
-            String nome = etNomeUsuario.getText().toString().trim();
-            salvarNome(nome); // Salva mesmo se abrir o cadastro
+        btnGerenciar.setVisibility(sessao.obterEhAdminCache() ? View.VISIBLE : View.GONE);
 
-            Intent intent = new Intent(this, CadastroThiltapeActivity.class);
-            intent.putExtra("ANDROID_ID", androidId);
-            startActivity(intent);
-        });
+        sincronizarPerfilServidor();
     }
 
-    private void salvarNome(String nome) {
-        if (!nome.isEmpty()) {
-            prefs.edit().putString("user_name", nome).apply();
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ThiltapesCachesImagem.limpar(this);
+        sincronizarPerfilServidor();
+    }
+
+    /**
+     * Envia nome novo ao backend (se mudou) e navega apos sucesso; se igual, so navega.
+     */
+    private void navegarAposSincronizarNome(@NonNull Intent destino) {
+        String nome = etNomeUsuario.getText().toString().trim();
+        if (nome.equals(ultimoNomeEnviado)) {
+            startActivity(destino);
+            return;
         }
+        ThiltapesSessao.de(this).salvarNomeLocal(nome);
+        if (nome.isEmpty()) {
+            ultimoNomeEnviado = nome;
+            startActivity(destino);
+            return;
+        }
+        try {
+            ThiltapesNomeSync.patchNome(this, nome, () -> {
+                ultimoNomeEnviado = nome;
+                sincronizarPerfilServidor();
+                startActivity(destino);
+            }, e -> Toast.makeText(InicioActivity.this, R.string.msg_erro_rede, Toast.LENGTH_SHORT).show());
+        } catch (JSONException e) {
+            Toast.makeText(this, R.string.msg_erro_parse, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void sincronizarPerfilServidor() {
+        ThiltapesApi.getMe(this, resposta -> {
+            try {
+                boolean admin = resposta.optBoolean("eh_admin", false);
+                ThiltapesSessao.de(InicioActivity.this).salvarEhAdmin(admin);
+                btnGerenciar.setVisibility(admin ? View.VISIBLE : View.GONE);
+                if (resposta.has("nome") && !resposta.isNull("nome")) {
+                    String nome = resposta.getString("nome");
+                    etNomeUsuario.setText(nome);
+                    ThiltapesSessao.de(InicioActivity.this).salvarNomeLocal(nome);
+                    ultimoNomeEnviado = nome;
+                }
+            } catch (JSONException e) {
+                Toast.makeText(this, R.string.msg_erro_parse, Toast.LENGTH_SHORT).show();
+            }
+        }, this::aoErroVolleyIgnoravel);
+    }
+
+    private void aoErroVolleyIgnoravel(VolleyError error) {
+        // Perfil opcional na entrada; falha de rede nao bloqueia a UI.
     }
 }

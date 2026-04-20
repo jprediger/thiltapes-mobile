@@ -4,4 +4,7 @@
     <dimen name="item_thiltape_altura">88dp</dimen>
     <dimen name="bottom_sheet_peek_height">120dp</dimen>
     <dimen name="bottom_sheet_padding_horizontal">8dp</dimen>
+    <!-- Espaco entre o topo da area recolhida do sheet e o botao inventario (peek + folga). -->
+    <dimen name="espaco_inventario_acima_sheet">8dp</dimen>
+    <dimen name="inventario_botao_margin_bottom">128dp</dimen>
 </resources>

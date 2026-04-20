@@ -3,12 +3,15 @@ package br.univates.mobile.thiltapes;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
@@ -22,11 +25,22 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.content.ContextCompat;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.android.volley.VolleyError;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.google.gson.JsonParser;
+
+import java.util.Optional;
+
+import br.univates.mobile.thiltapes.dto.AnaliseItem;
+import br.univates.mobile.thiltapes.dto.AnaliseResposta;
+import br.univates.mobile.thiltapes.dto.InventarioLinha;
 
 import org.maplibre.android.MapLibre;
 import org.maplibre.android.geometry.LatLng;
@@ -42,42 +56,46 @@ import org.maplibre.android.style.expressions.Expression;
 import org.maplibre.android.style.layers.FillExtrusionLayer;
 import org.maplibre.android.style.layers.PropertyFactory;
 
-import com.google.android.material.bottomsheet.BottomSheetBehavior;
-
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Mapa em tela cheia com seguimento da posição do dispositivo e amostragem da localização
- * para lógica de jogo (limiar espacial antes de notificar).
- *
- * @see <a href="https://maplibre.org/maplibre-native/android/api/">MapLibre Android SDK</a>
+ * Mapa do jogo: localizacao, {@code POST /analise} periodico e lista de thiltapes proximos.
  */
 public class MapaJogoActivity extends AppCompatActivity implements LocationListener {
 
-    /** Distância mínima (metros) entre amostras aceitas para atualizar {@link #localizacaoAtual} e notificar. */
+    public static final String EXTRA_JOGO_ID = "jogo_id";
+
     private static final float DISTANCIA_MINIMA_METROS = 5f;
+    private static final long INTERVALO_ANALISE_MS = 8000L;
 
     private static final String TAG = MapaJogoActivity.class.getSimpleName();
-
-    /** Placeholder de rede para mock até integração com API. */
-    private static final String URL_MOCK_THILTAPE = "https://unsplash.it/1024/1024";
-
-    /** Distâncias fixas (m) para cada item da lista mock. */
-    private static final float[] DISTANCIAS_MOCK_METROS = {
-            5f, 10f, 20f, 50f, 70f, 90f, 110f, 150f, 210f, 300f, 400f
-    };
 
     private MapView mapView;
     private @Nullable MapLibreMap map;
     private @Nullable LocationComponent tracker;
     private LocationManager locationManager;
 
-    /** Última posição aceita pelo limiar; usada em {@link #setLocalizacaoAtual(Location)}. */
     private @Nullable Location localizacaoAtual;
+
+    private final Handler handlerPrincipal = new Handler(Looper.getMainLooper());
+    private long ultimaAnaliseMs = 0L;
+
+    private int jogoId = -1;
+    /** Thiltape ids em qualquer jogo ({@code GET /inventario}) para contorno dourado e imagem nitida. */
+    private final Set<Integer> idsInventarioGlobal = new HashSet<>();
+    private RecyclerView recyclerThiltapes;
+    private TextView textoVazio;
+    private TextView textoPontuacaoJogo;
+    private ImagemMapaAdapter adapterThiltapes;
 
     private final ActivityResultLauncher<String[]> permissaoLocalizacaoLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
-                boolean fine = Boolean.TRUE.equals(result.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false));
+                boolean fine = Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION));
                 if (fine) {
                     if (map != null && map.getStyle() != null) {
                         iniciarRastreamentoNativo();
@@ -92,36 +110,60 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
         super.onCreate(savedInstanceState);
 
+        jogoId = getIntent().getIntExtra(EXTRA_JOGO_ID, -1);
+        if (jogoId < 0) {
+            Toast.makeText(this, R.string.msg_jogo_invalido, Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
         MapLibre.getInstance(this);
 
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_mapa_jogo);
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.activity_mapa_jogo), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
+        ThiltapesBarraSistema.aplicarPaddingEmView(findViewById(R.id.activity_mapa_jogo));
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        findViewById(R.id.btn_inventario_jogo_mapa).setOnClickListener(v -> abrirInventarioDoJogo());
+        textoPontuacaoJogo = findViewById(R.id.texto_pontuacao_jogo_mapa);
+        atualizarTextoPontuacao(0);
 
         mapView = findViewById(R.id.map_view);
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(this::aoMapaPronto);
 
         configurarPainelThiltapes();
+        carregarIdsInventarioGlobalParaMapa();
     }
 
-    /**
-     * Bottom sheet com grade de thiltapes próximos (mock), handle para expandir e lista vazia tratada.
-     */
+    private void carregarIdsInventarioGlobalParaMapa() {
+        ThiltapesApi.getInventario(this, null, array -> {
+            idsInventarioGlobal.clear();
+            for (InventarioLinha l : InventarioLinha.listFromJsonArrayLegacy(array)) {
+                idsInventarioGlobal.add(l.getThiltape().getId());
+            }
+            if (localizacaoAtual != null) {
+                executarAnaliseSePossivel();
+            }
+        }, e -> { /* inventario opcional para contorno */ });
+    }
+
+    private void abrirInventarioDoJogo() {
+        Intent i = new Intent(this, InventarioActivity.class);
+        i.putExtra(InventarioActivity.EXTRA_FILTRO_JOGO_ID, jogoId);
+        startActivity(i);
+    }
+
     private void configurarPainelThiltapes() {
         View sheet = findViewById(R.id.sheet_thiltapes);
-        RecyclerView recycler = findViewById(R.id.recycler_thiltapes);
-        TextView textoVazio = findViewById(R.id.texto_lista_vazia_thiltapes);
+        recyclerThiltapes = findViewById(R.id.recycler_thiltapes);
+        textoVazio = findViewById(R.id.texto_lista_vazia_thiltapes);
         View handle = findViewById(R.id.handle_thiltapes);
 
+        View containerInventario = findViewById(R.id.container_inventario_mapa);
+
         BottomSheetBehavior<View> behavior = BottomSheetBehavior.from(sheet);
-        // Sempre visível: só colapsado (primeira linha) ou expandido (tela cheia); nunca arrastar para fora.
         behavior.setHideable(false);
         behavior.setFitToContents(false);
         behavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
@@ -131,6 +173,8 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
                 if (newState == BottomSheetBehavior.STATE_HIDDEN) {
                     behavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
                 }
+                boolean colapsado = newState == BottomSheetBehavior.STATE_COLLAPSED;
+                containerInventario.setVisibility(colapsado ? View.VISIBLE : View.GONE);
             }
 
             @Override
@@ -147,30 +191,10 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
             }
         });
 
-        ArrayList<ThiltapeProximo> lista = gerarListaMockThiltapes();
-        if (lista.isEmpty()) {
-            recycler.setVisibility(View.GONE);
-            textoVazio.setVisibility(View.VISIBLE);
-        } else {
-            recycler.setVisibility(View.VISIBLE);
-            textoVazio.setVisibility(View.GONE);
-            recycler.setLayoutManager(new GridLayoutManager(this, 4));
-            ImagemMapaAdapter adapter = new ImagemMapaAdapter(lista,
-                    (item, posicao) -> ThiltapeFullscreenDialog.mostrar(MapaJogoActivity.this, item, posicao));
-            recycler.setAdapter(adapter);
-        }
+        recyclerThiltapes.setLayoutManager(new GridLayoutManager(this, 4));
+        atualizarListaRecycler(new ArrayList<>());
     }
 
-    /** Lista fixa de thiltapes mock (mesma URL) com distâncias em metros para testar máscara e saturação. */
-    private ArrayList<ThiltapeProximo> gerarListaMockThiltapes() {
-        ArrayList<ThiltapeProximo> lista = new ArrayList<>();
-        for (float metros : DISTANCIAS_MOCK_METROS) {
-            lista.add(new ThiltapeProximo(URL_MOCK_THILTAPE, false, metros));
-        }
-        return lista;
-    }
-
-    /** Configura estilo, prédios 3D e fluxo de permissão após o mapa estar pronto. */
     private void aoMapaPronto(@NonNull MapLibreMap mapLibreMap) {
         this.map = mapLibreMap;
         mapLibreMap.getUiSettings().setTiltGesturesEnabled(true);
@@ -186,7 +210,6 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
         });
     }
 
-    /** Camada de extrusão dos edifícios no estilo Liberty (openmaptiles). */
     private void configurarPredios3d(@NonNull Style style) {
         FillExtrusionLayer camada = new FillExtrusionLayer("3d-buildings", "openmaptiles");
         camada.setSourceLayer("building");
@@ -204,6 +227,7 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
             iniciarRastreamentoNativo();
+            agendarProximaAnalise(1500L);
         } else {
             permissaoLocalizacaoLauncher.launch(new String[]{
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -242,6 +266,123 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
         }
     }
 
+    private void agendarProximaAnalise(long atrasoMs) {
+        handlerPrincipal.removeCallbacks(tarefaAnalise);
+        handlerPrincipal.postDelayed(tarefaAnalise, atrasoMs);
+    }
+
+    private final Runnable tarefaAnalise = this::executarAnaliseSePossivel;
+
+    private void executarAnaliseSePossivel() {
+        if (isFinishing() || jogoId < 0 || localizacaoAtual == null) {
+            agendarProximaAnalise(INTERVALO_ANALISE_MS);
+            return;
+        }
+        long agora = android.os.SystemClock.elapsedRealtime();
+        if (agora - ultimaAnaliseMs < 2000L) {
+            agendarProximaAnalise(INTERVALO_ANALISE_MS);
+            return;
+        }
+        ultimaAnaliseMs = agora;
+        try {
+            ThiltapesApi.postAnalise(
+                    this,
+                    jogoId,
+                    localizacaoAtual.getLatitude(),
+                    localizacaoAtual.getLongitude(),
+                    this::aplicarRespostaAnalise,
+                    this::aoErroAnalise
+            );
+        } catch (JSONException e) {
+            Log.w(TAG, "JSON analise", e);
+        }
+        agendarProximaAnalise(INTERVALO_ANALISE_MS);
+    }
+
+    private void aplicarRespostaAnalise(JSONObject corpo) {
+        final AnaliseResposta r;
+        try {
+            Optional<AnaliseResposta> opt = AnaliseResposta.fromJson(
+                    JsonParser.parseString(corpo.toString()).getAsJsonObject());
+            if (opt.isEmpty()) {
+                Log.w(TAG, "parse analise: JSON invalido");
+                return;
+            }
+            r = opt.get();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "parse analise", e);
+            return;
+        }
+        List<Integer> idsNovosDesbloqueio = new ArrayList<>();
+        for (AnaliseItem item : r.getDesbloqueados()) {
+            idsNovosDesbloqueio.add(item.getThiltape().getId());
+        }
+        ThiltapesDesbloqueioPrefs.adicionarVarios(this, jogoId, idsNovosDesbloqueio);
+
+        Map<Integer, Float> distPorId = new HashMap<>();
+        for (AnaliseItem p : r.getProximos()) {
+            distPorId.put(p.getThiltape().getId(), (float) p.getDistanciaMetros());
+        }
+
+        Set<Integer> desbloqueados = ThiltapesDesbloqueioPrefs.obterIds(this, jogoId);
+        Set<Integer> uniao = new HashSet<>(desbloqueados);
+        uniao.addAll(distPorId.keySet());
+
+        List<ThiltapeProximo> lista = new ArrayList<>();
+        for (int id : uniao) {
+            float d = distPorId.containsKey(id)
+                    ? distPorId.get(id)
+                    : ThiltapesImagemConstantes.DISTANCIA_METROS_PIXELIZACAO_MAXIMA;
+            boolean desbloqueadoVisual = desbloqueados.contains(id) || idsInventarioGlobal.contains(id);
+            String url = ThiltapesUrls.urlImagemThiltape(id);
+            lista.add(new ThiltapeProximo(
+                    id,
+                    url,
+                    false,
+                    d,
+                    desbloqueadoVisual,
+                    true,
+                    desbloqueadoVisual
+            ));
+        }
+
+        atualizarListaRecycler(lista);
+        if (!idsNovosDesbloqueio.isEmpty()) {
+            carregarPontuacaoJogo();
+        }
+    }
+
+    /**
+     * Soma pontuacoes dos thiltapes coletados neste jogo ({@code GET /inventario?jogo_id=}).
+     */
+    private void carregarPontuacaoJogo() {
+        ThiltapesApi.getInventario(this, jogoId, array -> {
+            List<InventarioLinha> linhas = InventarioLinha.listFromJsonArrayLegacy(array);
+            atualizarTextoPontuacao(InventarioLinha.somarPontuacaoPorThiltapeUnico(linhas));
+        }, e -> atualizarTextoPontuacao(0));
+    }
+
+    private void atualizarTextoPontuacao(int total) {
+        textoPontuacaoJogo.setText(getString(R.string.pontuacao_jogo_format, total));
+    }
+
+    private void aoErroAnalise(VolleyError e) {
+        Log.w(TAG, "analise: " + e.toString());
+    }
+
+    private void atualizarListaRecycler(@NonNull List<ThiltapeProximo> lista) {
+        if (lista.isEmpty()) {
+            recyclerThiltapes.setVisibility(View.GONE);
+            textoVazio.setVisibility(View.VISIBLE);
+        } else {
+            recyclerThiltapes.setVisibility(View.VISIBLE);
+            textoVazio.setVisibility(View.GONE);
+            adapterThiltapes = new ImagemMapaAdapter(lista,
+                    (item, posicao) -> ThiltapeFullscreenDialog.mostrar(MapaJogoActivity.this, item, posicao));
+            recyclerThiltapes.setAdapter(adapterThiltapes);
+        }
+    }
+
     @SuppressLint("MissingPermission")
     @Override
     public void onLocationChanged(@NonNull Location location) {
@@ -251,10 +392,6 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
         setLocalizacaoAtual(location);
     }
 
-    /**
-     * Compara {@code localizacao} com {@link #localizacaoAtual}; se passar no limiar (ou primeira fix),
-     * atualiza o membro e notifica.
-     */
     private void setLocalizacaoAtual(@NonNull Location localizacao) {
         if (localizacaoAtual == null) {
             localizacaoAtual = new Location(localizacao);
@@ -275,15 +412,13 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
         }
     }
 
-    /**
-     * Chamado quando {@link #localizacaoAtual} avança pelo limiar; ponto de extensão (log, API, etc.).
-     */
     private void onNovaLocalizacaoPlayer(@NonNull LatLng localizacaoPlayer) {
         Log.i(TAG, String.format(
-                "Nova localização do jogador: lat=%f lon=%f",
+                "Nova localizacao: lat=%f lon=%f",
                 localizacaoPlayer.getLatitude(),
                 localizacaoPlayer.getLongitude()
         ));
+        executarAnaliseSePossivel();
     }
 
     @Override
@@ -295,7 +430,6 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
 
     @Override
     public void onProviderEnabled(@NonNull String provider) {
-        // Nada obrigatório: retomada ocorre em onResume.
     }
 
     @Override
@@ -308,6 +442,7 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
     protected void onResume() {
         super.onResume();
         mapView.onResume();
+        carregarPontuacaoJogo();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
             if (map != null && map.getStyle() != null && locationManager != null) {
@@ -321,6 +456,7 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
     protected void onPause() {
         super.onPause();
         mapView.onPause();
+        handlerPrincipal.removeCallbacks(tarefaAnalise);
     }
 
     @Override

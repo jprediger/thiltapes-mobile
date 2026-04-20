@@ -1,6 +1,8 @@
 package br.univates.mobile.thiltapes;
 
+import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.view.LayoutInflater;
@@ -14,8 +16,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.RequestBuilder;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.bumptech.glide.request.RequestOptions;
+import com.bumptech.glide.load.model.GlideUrl;
+import com.bumptech.glide.load.model.LazyHeaders;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 
@@ -23,7 +25,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Grade de miniaturas: carrega URL ou Base64, aplica limite de tamanho, saturação e overlay por distância.
+ * Grade de miniaturas: no mapa, itens ainda bloqueados recebem overlay por distancia; desbloqueados e
+ * inventario sem crop nem efeitos (apenas escala ao teto em {@link ThiltapesGlideOpcoesCarregamento}).
  */
 public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdapter.Holder> {
 
@@ -53,6 +56,11 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
     public void onBindViewHolder(@NonNull Holder holder, int position) {
         ThiltapeProximo item = itens.get(position);
         ImageView iv = holder.imagem;
+        View container = holder.container;
+
+        container.setBackgroundResource(
+                item.isContornoDourado() ? R.drawable.thiltape_outline_dourado : 0
+        );
 
         Glide.with(holder.itemView).clear(iv);
         iv.setImageDrawable(new ColorDrawable(0xFF333333));
@@ -63,7 +71,7 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
         if (emCache != null && !emCache.isRecycled()) {
             iv.setImageBitmap(emCache);
         } else {
-            carregarMiniatura(holder.itemView, iv, item, position, chave);
+            carregarMiniatura(holder.itemView.getContext(), holder.itemView, iv, item, position, chave);
         }
 
         holder.itemView.setOnClickListener(v -> {
@@ -85,24 +93,36 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
         Glide.with(holder.itemView).clear(holder.imagem);
     }
 
+    /**
+     * Permite reutilizar o carregamento (ex.: inventario em outro RecyclerView).
+     */
+    public static void carregarMiniaturaPublica(
+            @NonNull Context contexto,
+            @NonNull View itemView,
+            @NonNull ImageView imageView,
+            @NonNull ThiltapeProximo item,
+            int position,
+            @NonNull String chaveCache) {
+        carregarMiniatura(contexto, itemView, imageView, item, position, chaveCache);
+    }
+
     private static void carregarMiniatura(
+            @NonNull Context contexto,
             @NonNull View itemView,
             @NonNull ImageView imageView,
             @NonNull ThiltapeProximo item,
             int position,
             @NonNull String chaveCache) {
 
-        // centerCrop quadrado: mesma região recortada que em ThiltapeFullscreenDialog + GeradorOverlayThiltape.
-        RequestOptions opts = new RequestOptions()
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .skipMemoryCache(true)
-                .override(
-                        ThiltapesImagemConstantes.CARREGAMENTO_THILTAPE_LADO_PX,
-                        ThiltapesImagemConstantes.CARREGAMENTO_THILTAPE_LADO_PX)
-                .centerCrop();
+        imageView.setTag(R.id.tag_bind_posicao_thiltape, position);
 
         RequestBuilder<Bitmap> rb = Glide.with(itemView).asBitmap();
-        if (item.isEhBase64()) {
+        if (item.isImagemRequerAuthBasica()) {
+            LazyHeaders headers = new LazyHeaders.Builder()
+                    .addHeader("Authorization", ThiltapesSessao.de(contexto).obterCabeçalhoAuthorization())
+                    .build();
+            rb = rb.load(new GlideUrl(item.getFonte(), headers));
+        } else if (item.isEhBase64()) {
             if (ThiltapesBase64Util.excedeLimiteArquivo(item.getFonte())) {
                 return;
             }
@@ -117,7 +137,7 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
         }
 
         final int posicaoEsperada = position;
-        rb.apply(opts).into(new CustomTarget<Bitmap>(
+        rb.apply(ThiltapesGlideOpcoesCarregamento.opcoesListaOuFullscreen(item)).into(new CustomTarget<Bitmap>(
                 ThiltapesImagemConstantes.CARREGAMENTO_THILTAPE_LADO_PX,
                 ThiltapesImagemConstantes.CARREGAMENTO_THILTAPE_LADO_PX) {
             @Override
@@ -132,9 +152,7 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
                         || resource.getHeight() > ThiltapesImagemConstantes.LIMITE_DIMENSAO_MAXIMA_POR_LADO_PX) {
                     return;
                 }
-                Bitmap composto = GeradorOverlayThiltape.criarMiniaturaComposta(
-                        resource,
-                        item.getDistanciaMetros());
+                Bitmap composto = montarMiniatura(resource, item);
                 ThiltapesCacheBitmapLru.colocar(chaveCache, composto);
                 imageView.setImageBitmap(composto);
             }
@@ -145,12 +163,29 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
         });
     }
 
+    @NonNull
+    private static Bitmap montarMiniatura(@NonNull Bitmap resource, @NonNull ThiltapeProximo item) {
+        if (item.isDesbloqueado()) {
+            Bitmap copia = Bitmap.createBitmap(
+                    resource.getWidth(),
+                    resource.getHeight(),
+                    Bitmap.Config.ARGB_8888
+            );
+            Canvas canvas = new Canvas(copia);
+            canvas.drawBitmap(resource, 0f, 0f, null);
+            return copia;
+        }
+        return GeradorOverlayThiltape.criarMiniaturaComposta(resource, item.getDistanciaMetros());
+    }
+
     static final class Holder extends RecyclerView.ViewHolder {
         final ImageView imagem;
+        final View container;
 
         Holder(@NonNull View itemView) {
             super(itemView);
             imagem = itemView.findViewById(R.id.imagem_miniatura);
+            container = itemView.findViewById(R.id.container_miniatura_thiltape);
         }
     }
 }

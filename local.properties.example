@@ -1,0 +1,3 @@
+# Copie para local.properties e ajuste. A URL base da API thiltapes (sem barra final).
+# Mantenha o que ja existe no local.properties gerado pelo android studio
+THILTAPES_API_BASE_URL=http://192.168.0.106:3000

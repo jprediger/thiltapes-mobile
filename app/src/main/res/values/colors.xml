@@ -2,4 +2,12 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- Lista de jogos: fundo da tela (lista publica vs gerenciar diferem so nisso). -->
+    <color name="lista_jogos_fundo_tela">#02332A</color>
+    <color name="gerenciar_jogos_fundo_tela">#0E3D35</color>
+    <!-- Itens da lista (mesmo design nas duas telas). -->
+    <color name="lista_item_fundo">#FFF8F8F8</color>
+    <color name="lista_item_titulo">#FF1A1A1A</color>
+    <color name="lista_item_subtitulo">#FF5C5C5C</color>
+    <color name="ic_launcher_background">#FFFFFFFF</color>
 </resources>
