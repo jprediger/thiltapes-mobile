@@ -8,7 +8,7 @@ import com.google.gson.JsonObject;
 import java.util.Optional;
 
 /**
- * Thiltape exposto pela API publica (sem bytes da imagem; ver {@code thiltapePublico} no backend).
+ * Thiltape exposto pela API publica (sem bytes da imagem; ver {@code ThiltapeResponse} no backend Go).
  */
 public final class ThiltapePublico {
 
@@ -51,12 +51,12 @@ public final class ThiltapePublico {
         try {
             return Optional.of(new ThiltapePublico(
                     json.get("id").getAsInt(),
-                    json.get("jogo_id").getAsInt(),
-                    json.get("nome").getAsString(),
-                    json.get("pontuacao").getAsInt(),
+                    json.get("game_id").getAsInt(),
+                    json.get("name").getAsString(),
+                    json.get("score").getAsInt(),
                     json.get("lat").getAsDouble(),
                     json.get("lng").getAsDouble(),
-                    json.get("imagem_url").getAsString()
+                    json.get("image_url").getAsString()
             ));
         } catch (RuntimeException ignored) {
             return Optional.empty();

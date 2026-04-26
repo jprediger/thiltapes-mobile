@@ -1,6 +1,5 @@
 package br.univates.mobile.thiltapes;
 
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.ColorDrawable;
@@ -16,8 +15,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.RequestBuilder;
-import com.bumptech.glide.load.model.GlideUrl;
-import com.bumptech.glide.load.model.LazyHeaders;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 
@@ -71,7 +68,7 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
         if (emCache != null && !emCache.isRecycled()) {
             iv.setImageBitmap(emCache);
         } else {
-            carregarMiniatura(holder.itemView.getContext(), holder.itemView, iv, item, position, chave);
+            carregarMiniatura(holder.itemView, iv, item, position, chave);
         }
 
         holder.itemView.setOnClickListener(v -> {
@@ -97,17 +94,15 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
      * Permite reutilizar o carregamento (ex.: inventario em outro RecyclerView).
      */
     public static void carregarMiniaturaPublica(
-            @NonNull Context contexto,
             @NonNull View itemView,
             @NonNull ImageView imageView,
             @NonNull ThiltapeProximo item,
             int position,
             @NonNull String chaveCache) {
-        carregarMiniatura(contexto, itemView, imageView, item, position, chaveCache);
+        carregarMiniatura(itemView, imageView, item, position, chaveCache);
     }
 
     private static void carregarMiniatura(
-            @NonNull Context contexto,
             @NonNull View itemView,
             @NonNull ImageView imageView,
             @NonNull ThiltapeProximo item,
@@ -117,12 +112,7 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
         imageView.setTag(R.id.tag_bind_posicao_thiltape, position);
 
         RequestBuilder<Bitmap> rb = Glide.with(itemView).asBitmap();
-        if (item.isImagemRequerAuthBasica()) {
-            LazyHeaders headers = new LazyHeaders.Builder()
-                    .addHeader("Authorization", ThiltapesSessao.de(contexto).obterCabeçalhoAuthorization())
-                    .build();
-            rb = rb.load(new GlideUrl(item.getFonte(), headers));
-        } else if (item.isEhBase64()) {
+        if (item.isEhBase64()) {
             if (ThiltapesBase64Util.excedeLimiteArquivo(item.getFonte())) {
                 return;
             }

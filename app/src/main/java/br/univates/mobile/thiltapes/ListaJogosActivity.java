@@ -56,7 +56,7 @@ public class ListaJogosActivity extends AppCompatActivity {
             for (int i = 0; i < array.length(); i++) {
                 JSONObject o = array.getJSONObject(i);
                 int jid = o.optInt("id", -1);
-                String nome = o.optString("nome", "?");
+                String nome = o.optString("name", "?");
                 if (jid >= 0) {
                     jogos.add(new ItemListaJogos(jid, nome));
                 }

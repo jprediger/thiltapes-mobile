@@ -3,7 +3,8 @@ package br.univates.mobile.thiltapes;
 import androidx.annotation.NonNull;
 
 /**
- * Thiltape próximo no radar: fonte de imagem, distancia para efeitos e estado desbloqueado.
+ * Thiltape proximo no radar: fonte de imagem, distancia para efeitos e estado desbloqueado.
+ * Imagens vem de {@code /uploads/*} (publicas), entao nao requerem cabecalho de autenticacao.
  */
 public final class ThiltapeProximo {
 
@@ -14,7 +15,6 @@ public final class ThiltapeProximo {
     private final float distanciaMetros;
     /** Sem saturacao/pixelizacao (ex.: ja desbloqueado). */
     private final boolean desbloqueado;
-    private final boolean imagemRequerAuthBasica;
     /** Contorno dourado no radar para itens desbloqueados; nao usado no inventario. */
     private final boolean contornoDourado;
 
@@ -22,7 +22,7 @@ public final class ThiltapeProximo {
      * Mock ou dados locais sem id de API.
      */
     public ThiltapeProximo(String fonte, boolean ehBase64, float distanciaMetros) {
-        this(-1, fonte, ehBase64, distanciaMetros, false, false, false);
+        this(-1, fonte, ehBase64, distanciaMetros, false, false);
     }
 
     public ThiltapeProximo(
@@ -31,14 +31,12 @@ public final class ThiltapeProximo {
             boolean ehBase64,
             float distanciaMetros,
             boolean desbloqueado,
-            boolean imagemRequerAuthBasica,
             boolean contornoDourado) {
         this.thiltapeId = thiltapeId;
         this.fonte = fonte;
         this.ehBase64 = ehBase64;
         this.distanciaMetros = distanciaMetros;
         this.desbloqueado = desbloqueado;
-        this.imagemRequerAuthBasica = imagemRequerAuthBasica;
         this.contornoDourado = contornoDourado;
     }
 
@@ -58,14 +56,9 @@ public final class ThiltapeProximo {
         return distanciaMetros;
     }
 
-    /** Se true, nao aplica pixelizacao/saturacao e usa imagem nítida. */
+    /** Se true, nao aplica pixelizacao/saturacao e usa imagem nitida. */
     public boolean isDesbloqueado() {
         return desbloqueado;
-    }
-
-    /** Glide deve enviar Authorization ao buscar {@link #getFonte()} (URL da API). */
-    public boolean isImagemRequerAuthBasica() {
-        return imagemRequerAuthBasica;
     }
 
     public boolean isContornoDourado() {
@@ -73,7 +66,7 @@ public final class ThiltapeProximo {
     }
 
     /**
-     * Chave estável para cache de bitmap composto (lista), inclui id e estado de desbloqueio.
+     * Chave estavel para cache de bitmap composto (lista), inclui id e estado de desbloqueio.
      */
     public String chaveCacheLista(int indiceLista) {
         long bucketDistancia = Math.round(distanciaMetros * 10f);

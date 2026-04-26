@@ -17,17 +17,15 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Um item de {@code GET /inventario}: {@code encontrado_em} + objeto {@code thiltape} publico.
+ * Um item de {@code GET /inventario}: o backend Go retorna {@code []ThiltapeResponse} direto,
+ * cada elemento e um {@link ThiltapePublico}.
  */
 public final class InventarioLinha {
 
-    @Nullable
-    private final String encontradoEm;
     @NonNull
     private final ThiltapePublico thiltape;
 
-    public InventarioLinha(@Nullable String encontradoEm, @NonNull ThiltapePublico thiltape) {
-        this.encontradoEm = encontradoEm;
+    public InventarioLinha(@NonNull ThiltapePublico thiltape) {
         this.thiltape = thiltape;
     }
 
@@ -36,17 +34,7 @@ public final class InventarioLinha {
         if (json == null) {
             return Optional.empty();
         }
-        JsonElement th = json.get("thiltape");
-        if (th == null || th.isJsonNull() || !th.isJsonObject()) {
-            return Optional.empty();
-        }
-        String encontrado = null;
-        if (json.has("encontrado_em") && !json.get("encontrado_em").isJsonNull()) {
-            encontrado = json.get("encontrado_em").getAsString();
-        }
-        final String encontradoFinal = encontrado;
-        return ThiltapePublico.fromJson(th.getAsJsonObject())
-                .map(t -> new InventarioLinha(encontradoFinal, t));
+        return ThiltapePublico.fromJson(json).map(InventarioLinha::new);
     }
 
     @NonNull
@@ -86,11 +74,6 @@ public final class InventarioLinha {
             total += t.getPontuacao();
         }
         return total;
-    }
-
-    @Nullable
-    public String getEncontradoEm() {
-        return encontradoEm;
     }
 
     @NonNull

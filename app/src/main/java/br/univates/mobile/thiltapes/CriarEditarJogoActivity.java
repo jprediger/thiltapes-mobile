@@ -26,7 +26,6 @@ import androidx.core.content.ContextCompat;
 
 import com.android.volley.VolleyError;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -87,7 +86,7 @@ public class CriarEditarJogoActivity extends AppCompatActivity {
         ThiltapesApi.getJogo(this, jogoId,
                 jogo -> {
                     try {
-                        etNomeJogo.setText(jogo.getString("nome"));
+                        etNomeJogo.setText(jogo.getString("name"));
                     } catch (JSONException e) {
                         Toast.makeText(this, R.string.msg_erro_parse, Toast.LENGTH_SHORT).show();
                     }
@@ -127,9 +126,9 @@ public class CriarEditarJogoActivity extends AppCompatActivity {
         EditText lat = linha.findViewById(R.id.et_lat_edicao);
         EditText lng = linha.findViewById(R.id.et_lng_edicao);
 
-        nome.setText(o.optString("nome", ""));
-        if (o.has("pontuacao") && !o.isNull("pontuacao")) {
-            pts.setText(String.valueOf(o.getInt("pontuacao")));
+        nome.setText(o.optString("name", ""));
+        if (o.has("score") && !o.isNull("score")) {
+            pts.setText(String.valueOf(o.getInt("score")));
         }
         lat.setText(formatarCoord(o.optDouble("lat")));
         lng.setText(formatarCoord(o.optDouble("lng")));
@@ -138,7 +137,8 @@ public class CriarEditarJogoActivity extends AppCompatActivity {
         linha.setTag(R.id.tag_thiltape_img_origem, Boolean.TRUE);
         container.addView(linha);
 
-        ThiltapesImagemApiGlide.carregarImagemThiltape(iv, sid, linha);
+        String imagemUrl = o.optString("image_url", "");
+        ThiltapesImagemApiGlide.carregarImagemThiltape(iv, imagemUrl, linha);
     }
 
     @NonNull
@@ -278,7 +278,7 @@ public class CriarEditarJogoActivity extends AppCompatActivity {
 
     private void atualizarNomeJogo(@NonNull String nome, @NonNull Runnable depois) {
         try {
-            ThiltapesApi.patchJogo(this, jogoId, nome,
+            ThiltapesApi.putJogo(this, jogoId, nome,
                     res -> depois.run(),
                     e -> runOnUiThread(() -> Toast.makeText(this, R.string.msg_erro_rede, Toast.LENGTH_SHORT).show())
             );
@@ -337,8 +337,8 @@ public class CriarEditarJogoActivity extends AppCompatActivity {
         Object sidObj = linha.getTag(R.id.tag_thiltape_server_id);
         if (sidObj instanceof Integer) {
             int sid = (Integer) sidObj;
-            JSONObject patch = montarPatchThiltape(linha);
-            ThiltapesApi.patchThiltape(this, sid, patch,
+            JSONObject put = montarPutThiltape(linha);
+            ThiltapesApi.putThiltape(this, sid, put,
                     r -> {
                         try {
                             processarFilaLinhas(fila, fim);
@@ -376,32 +376,32 @@ public class CriarEditarJogoActivity extends AppCompatActivity {
             return null;
         }
         JSONObject o = new JSONObject();
-        o.put("nome", nome.getText().toString().trim());
+        o.put("name", nome.getText().toString().trim());
         int p = parseIntOuPadrao(pts.getText().toString().trim(), 1);
-        o.put("pontuacao", Math.max(1, p));
+        o.put("score", Math.max(1, p));
         o.put("lat", Double.parseDouble(lat.getText().toString().trim()));
         o.put("lng", Double.parseDouble(lng.getText().toString().trim()));
-        o.put("img_b64", jpegBase64(bmp));
+        o.put("image_base64", jpegBase64(bmp));
         return o;
     }
 
     @NonNull
-    private JSONObject montarPatchThiltape(@NonNull View linha) throws JSONException {
+    private JSONObject montarPutThiltape(@NonNull View linha) throws JSONException {
         EditText nome = linha.findViewById(R.id.et_nome_thiltape_edicao);
         EditText pts = linha.findViewById(R.id.et_pontos_thiltape_edicao);
         EditText lat = linha.findViewById(R.id.et_lat_edicao);
         EditText lng = linha.findViewById(R.id.et_lng_edicao);
         JSONObject o = new JSONObject();
-        o.put("nome", nome.getText().toString().trim());
+        o.put("name", nome.getText().toString().trim());
         int p = parseIntOuPadrao(pts.getText().toString().trim(), 1);
-        o.put("pontuacao", Math.max(1, p));
+        o.put("score", Math.max(1, p));
         o.put("lat", Double.parseDouble(lat.getText().toString().trim()));
         o.put("lng", Double.parseDouble(lng.getText().toString().trim()));
         Bitmap bmp = obterBitmap(linha);
         Object origem = linha.getTag(R.id.tag_thiltape_img_origem);
         boolean veioDoServidorSemPreview = Boolean.TRUE.equals(origem);
         if (bmp != null && !veioDoServidorSemPreview) {
-            o.put("img_b64", jpegBase64(bmp));
+            o.put("image_base64", jpegBase64(bmp));
         }
         return o;
     }

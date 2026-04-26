@@ -61,14 +61,20 @@ public class InicioActivity extends AppCompatActivity {
 
         btnGerenciar.setVisibility(sessao.obterEhAdminCache() ? View.VISIBLE : View.GONE);
 
-        sincronizarPerfilServidor();
+        garantirTokenESincronizar();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         ThiltapesCachesImagem.limpar(this);
-        sincronizarPerfilServidor();
+        garantirTokenESincronizar();
+    }
+
+    private void garantirTokenESincronizar() {
+        ThiltapesAuthBootstrap.garantirToken(this,
+                this::sincronizarPerfilServidor,
+                this::aoErroVolleyIgnoravel);
     }
 
     /**
@@ -100,11 +106,11 @@ public class InicioActivity extends AppCompatActivity {
     private void sincronizarPerfilServidor() {
         ThiltapesApi.getMe(this, resposta -> {
             try {
-                boolean admin = resposta.optBoolean("eh_admin", false);
+                boolean admin = resposta.optBoolean("is_admin", false);
                 ThiltapesSessao.de(InicioActivity.this).salvarEhAdmin(admin);
                 btnGerenciar.setVisibility(admin ? View.VISIBLE : View.GONE);
-                if (resposta.has("nome") && !resposta.isNull("nome")) {
-                    String nome = resposta.getString("nome");
+                if (resposta.has("name") && !resposta.isNull("name")) {
+                    String nome = resposta.getString("name");
                     etNomeUsuario.setText(nome);
                     ThiltapesSessao.de(InicioActivity.this).salvarNomeLocal(nome);
                     ultimoNomeEnviado = nome;

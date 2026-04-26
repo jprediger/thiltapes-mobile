@@ -14,8 +14,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.RequestBuilder;
-import com.bumptech.glide.load.model.GlideUrl;
-import com.bumptech.glide.load.model.LazyHeaders;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.github.chrisbanes.photoview.PhotoView;
@@ -58,12 +56,7 @@ public final class ThiltapeFullscreenDialog {
         ThiltapesBarraSistema.aplicarNoDialogo(dialog, R.id.root_thiltape_fullscreen);
 
         RequestBuilder<Bitmap> rb = Glide.with(activity).asBitmap();
-        if (item.isImagemRequerAuthBasica()) {
-            LazyHeaders headers = new LazyHeaders.Builder()
-                    .addHeader("Authorization", ThiltapesSessao.de(activity).obterCabeçalhoAuthorization())
-                    .build();
-            rb = rb.load(new GlideUrl(item.getFonte(), headers));
-        } else if (item.isEhBase64()) {
+        if (item.isEhBase64()) {
             if (ThiltapesBase64Util.excedeLimiteArquivo(item.getFonte())) {
                 dialog.dismiss();
                 return;

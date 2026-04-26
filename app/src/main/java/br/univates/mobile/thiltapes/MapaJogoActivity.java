@@ -31,16 +31,16 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.android.volley.VolleyError;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.google.gson.JsonParser;
 
 import java.util.Optional;
 
-import br.univates.mobile.thiltapes.dto.AnaliseItem;
-import br.univates.mobile.thiltapes.dto.AnaliseResposta;
 import br.univates.mobile.thiltapes.dto.InventarioLinha;
+import br.univates.mobile.thiltapes.dto.ScanItem;
+import br.univates.mobile.thiltapes.dto.ScanResposta;
+import br.univates.mobile.thiltapes.dto.ThiltapePublico;
 
 import org.maplibre.android.MapLibre;
 import org.maplibre.android.geometry.LatLng;
@@ -64,7 +64,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Mapa do jogo: localizacao, {@code POST /analise} periodico e lista de thiltapes proximos.
+ * Mapa do jogo: localizacao, {@code GET /jogos/:jogoId/scan} periodico e lista de thiltapes proximos.
  */
 public class MapaJogoActivity extends AppCompatActivity implements LocationListener {
 
@@ -86,8 +86,8 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
     private long ultimaAnaliseMs = 0L;
 
     private int jogoId = -1;
-    /** Thiltape ids em qualquer jogo ({@code GET /inventario}) para contorno dourado e imagem nitida. */
-    private final Set<Integer> idsInventarioGlobal = new HashSet<>();
+    /** Thiltapes em qualquer jogo ({@code GET /inventario}): contorno dourado, imagem nitida e fallback de URL. */
+    private final Map<Integer, ThiltapePublico> inventarioGlobalPorId = new HashMap<>();
     private RecyclerView recyclerThiltapes;
     private TextView textoVazio;
     private TextView textoPontuacaoJogo;
@@ -139,9 +139,10 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
 
     private void carregarIdsInventarioGlobalParaMapa() {
         ThiltapesApi.getInventario(this, null, array -> {
-            idsInventarioGlobal.clear();
+            inventarioGlobalPorId.clear();
             for (InventarioLinha l : InventarioLinha.listFromJsonArrayLegacy(array)) {
-                idsInventarioGlobal.add(l.getThiltape().getId());
+                ThiltapePublico t = l.getThiltape();
+                inventarioGlobalPorId.put(t.getId(), t);
             }
             if (localizacaoAtual != null) {
                 executarAnaliseSePossivel();
@@ -284,44 +285,45 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
             return;
         }
         ultimaAnaliseMs = agora;
-        try {
-            ThiltapesApi.postAnalise(
-                    this,
-                    jogoId,
-                    localizacaoAtual.getLatitude(),
-                    localizacaoAtual.getLongitude(),
-                    this::aplicarRespostaAnalise,
-                    this::aoErroAnalise
-            );
-        } catch (JSONException e) {
-            Log.w(TAG, "JSON analise", e);
-        }
+        ThiltapesApi.getScan(
+                this,
+                jogoId,
+                localizacaoAtual.getLatitude(),
+                localizacaoAtual.getLongitude(),
+                this::aplicarRespostaScan,
+                this::aoErroAnalise
+        );
         agendarProximaAnalise(INTERVALO_ANALISE_MS);
     }
 
-    private void aplicarRespostaAnalise(JSONObject corpo) {
-        final AnaliseResposta r;
+    private void aplicarRespostaScan(JSONObject corpo) {
+        final ScanResposta r;
         try {
-            Optional<AnaliseResposta> opt = AnaliseResposta.fromJson(
+            Optional<ScanResposta> opt = ScanResposta.fromJson(
                     JsonParser.parseString(corpo.toString()).getAsJsonObject());
             if (opt.isEmpty()) {
-                Log.w(TAG, "parse analise: JSON invalido");
+                Log.w(TAG, "parse scan: JSON invalido");
                 return;
             }
             r = opt.get();
         } catch (RuntimeException e) {
-            Log.w(TAG, "parse analise", e);
+            Log.w(TAG, "parse scan", e);
             return;
         }
+        Map<Integer, ThiltapePublico> publicoPorId = new HashMap<>();
         List<Integer> idsNovosDesbloqueio = new ArrayList<>();
-        for (AnaliseItem item : r.getDesbloqueados()) {
-            idsNovosDesbloqueio.add(item.getThiltape().getId());
+        for (ScanItem item : r.getCapturados()) {
+            ThiltapePublico t = item.getThiltape();
+            publicoPorId.put(t.getId(), t);
+            idsNovosDesbloqueio.add(t.getId());
         }
         ThiltapesDesbloqueioPrefs.adicionarVarios(this, jogoId, idsNovosDesbloqueio);
 
         Map<Integer, Float> distPorId = new HashMap<>();
-        for (AnaliseItem p : r.getProximos()) {
-            distPorId.put(p.getThiltape().getId(), (float) p.getDistanciaMetros());
+        for (ScanItem p : r.getProximos()) {
+            ThiltapePublico t = p.getThiltape();
+            publicoPorId.putIfAbsent(t.getId(), t);
+            distPorId.put(t.getId(), (float) p.getDistanciaMetros());
         }
 
         Set<Integer> desbloqueados = ThiltapesDesbloqueioPrefs.obterIds(this, jogoId);
@@ -333,15 +335,18 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
             float d = distPorId.containsKey(id)
                     ? distPorId.get(id)
                     : ThiltapesImagemConstantes.DISTANCIA_METROS_PIXELIZACAO_MAXIMA;
-            boolean desbloqueadoVisual = desbloqueados.contains(id) || idsInventarioGlobal.contains(id);
-            String url = ThiltapesUrls.urlImagemThiltape(id);
+            boolean desbloqueadoVisual = desbloqueados.contains(id) || inventarioGlobalPorId.containsKey(id);
+            ThiltapePublico publico = publicoPorId.get(id);
+            if (publico == null) {
+                publico = inventarioGlobalPorId.get(id);
+            }
+            String url = (publico != null) ? ThiltapesUrls.urlImagemAbsoluta(publico.getImagemUrl()) : "";
             lista.add(new ThiltapeProximo(
                     id,
                     url,
                     false,
                     d,
                     desbloqueadoVisual,
-                    true,
                     desbloqueadoVisual
             ));
         }

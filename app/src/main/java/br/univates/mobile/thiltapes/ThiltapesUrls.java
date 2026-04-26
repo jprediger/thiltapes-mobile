@@ -27,9 +27,20 @@ public final class ThiltapesUrls {
         return sb.toString();
     }
 
-    /** GET autenticado para bytes da imagem do thiltape ({@code /thiltapes/{id}/imagem}). */
+    /**
+     * Monta URL absoluta a partir de um caminho relativo retornado pela API
+     * (ex.: {@code /uploads/abcd.png}). Imagens em {@code /uploads/*} sao publicas
+     * — nao precisam de header de autenticacao.
+     */
     @NonNull
-    public static String urlImagemThiltape(int thiltapeId) {
-        return caminho("thiltapes", String.valueOf(thiltapeId), "imagem");
+    public static String urlImagemAbsoluta(@NonNull String caminhoRelativo) {
+        String base = BuildConfig.API_BASE_URL;
+        if (base.endsWith("/") && caminhoRelativo.startsWith("/")) {
+            return base + caminhoRelativo.substring(1);
+        }
+        if (!base.endsWith("/") && !caminhoRelativo.startsWith("/")) {
+            return base + "/" + caminhoRelativo;
+        }
+        return base + caminhoRelativo;
     }
 }

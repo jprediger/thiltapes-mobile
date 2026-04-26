@@ -12,14 +12,12 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.GlideException;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
-import com.bumptech.glide.load.model.GlideUrl;
-import com.bumptech.glide.load.model.LazyHeaders;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.RequestOptions;
 import com.bumptech.glide.request.target.Target;
 
 /**
- * Carrega bytes de {@code GET /thiltapes/{id}/imagem} (Basic Auth) para preview no CRUD.
+ * Carrega imagem publica do thiltape ({@code /uploads/...}) para preview no CRUD.
  * Sem recorte central nem efeitos de jogo; apenas teto de dimensao e escala proporcional.
  */
 public final class ThiltapesImagemApiGlide {
@@ -30,18 +28,20 @@ public final class ThiltapesImagemApiGlide {
     /**
      * Preenche um {@link ImageView} com a imagem do thiltape no servidor (ex.: edicao de jogo).
      *
-     * @param linhaEdicao linha do formulario; se o usuario ja trocou a foto ({@code tag_thiltape_img_origem}
-     *                    false), o resultado assincrono da rede nao sobrescreve a miniatura local.
+     * @param imagemUrlRelativa caminho retornado pela API em {@code image_url} (ex.: {@code /uploads/abc.png}).
+     *                          Quando vazio, nao agenda carregamento.
+     * @param linhaEdicao       linha do formulario; se o usuario ja trocou a foto ({@code tag_thiltape_img_origem}
+     *                          false), o resultado assincrono da rede nao sobrescreve a miniatura local.
      */
     public static void carregarImagemThiltape(
             @NonNull ImageView imageView,
-            int thiltapeId,
+            @NonNull String imagemUrlRelativa,
             @NonNull View linhaEdicao) {
         Glide.with(imageView).clear(imageView);
-        String url = ThiltapesUrls.urlImagemThiltape(thiltapeId);
-        LazyHeaders headers = new LazyHeaders.Builder()
-                .addHeader("Authorization", ThiltapesSessao.de(imageView.getContext()).obterCabeçalhoAuthorization())
-                .build();
+        if (imagemUrlRelativa.isEmpty()) {
+            return;
+        }
+        String url = ThiltapesUrls.urlImagemAbsoluta(imagemUrlRelativa);
         RequestOptions opts = new RequestOptions()
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .override(
@@ -50,7 +50,7 @@ public final class ThiltapesImagemApiGlide {
                 .fitCenter()
                 .placeholder(new ColorDrawable(0xFFEEEEEE));
         Glide.with(imageView)
-                .load(new GlideUrl(url, headers))
+                .load(url)
                 .apply(opts)
                 .listener(new RequestListener<Drawable>() {
                     @Override

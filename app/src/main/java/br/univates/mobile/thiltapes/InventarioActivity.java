@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import br.univates.mobile.thiltapes.dto.InventarioLinha;
+import br.univates.mobile.thiltapes.dto.ThiltapePublico;
 
 /**
  * Inventario global ou filtrado por {@code jogo_id} ({@code GET /inventario?jogo_id=}).
@@ -53,22 +54,20 @@ public class InventarioActivity extends AppCompatActivity {
 
     private void montarGrade(JSONArray array) {
         List<InventarioLinha> linhas = InventarioLinha.listFromJsonArrayLegacy(array);
-        List<Integer> ids = new ArrayList<>();
-        for (InventarioLinha l : linhas) {
-            int tid = l.getThiltape().getId();
-            if (tid >= 0 && !ids.contains(tid)) {
-                ids.add(tid);
-            }
-        }
-
         List<ThiltapeProximo> itens = new ArrayList<>();
-        for (int tid : ids) {
+        java.util.Set<Integer> jaAdicionados = new java.util.HashSet<>();
+        for (InventarioLinha l : linhas) {
+            ThiltapePublico t = l.getThiltape();
+            int tid = t.getId();
+            if (tid < 0 || jaAdicionados.contains(tid)) {
+                continue;
+            }
+            jaAdicionados.add(tid);
             itens.add(new ThiltapeProximo(
                     tid,
-                    ThiltapesUrls.urlImagemThiltape(tid),
+                    ThiltapesUrls.urlImagemAbsoluta(t.getImagemUrl()),
                     false,
                     0f,
-                    true,
                     true,
                     false
             ));
@@ -113,7 +112,6 @@ public class InventarioActivity extends AppCompatActivity {
             ThiltapeProximo item = itens.get(position);
             h.container.setBackgroundResource(0);
             ImagemMapaAdapter.carregarMiniaturaPublica(
-                    activity,
                     h.itemView,
                     h.imagem,
                     item,

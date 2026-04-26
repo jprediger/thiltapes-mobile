@@ -54,7 +54,7 @@ public class GerenciarJogosActivity extends AppCompatActivity {
     }
 
     private void carregar() {
-        ThiltapesApi.getJogos(this, "dono=eu", this::preencher, this::aoErro);
+        ThiltapesApi.getJogos(this, null, this::preencher, this::aoErro);
     }
 
     private void preencher(JSONArray array) {
@@ -62,7 +62,7 @@ public class GerenciarJogosActivity extends AppCompatActivity {
         try {
             for (int i = 0; i < array.length(); i++) {
                 JSONObject o = array.getJSONObject(i);
-                jogos.add(new ItemListaJogos(o.getInt("id"), o.getString("nome")));
+                jogos.add(new ItemListaJogos(o.getInt("id"), o.getString("name")));
             }
         } catch (JSONException e) {
             Toast.makeText(this, R.string.msg_erro_parse, Toast.LENGTH_SHORT).show();
