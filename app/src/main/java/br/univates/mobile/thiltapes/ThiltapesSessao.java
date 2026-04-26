@@ -16,6 +16,7 @@ public final class ThiltapesSessao {
     private static final String K_NOME = "nome_exibido";
     private static final String K_EH_ADMIN = "eh_admin";
     private static final String K_TOKEN = "token";
+    private static final String K_API_BASE_URL_TOKEN = "api_base_url_token";
 
     private final SharedPreferences prefs;
     private final String androidId;
@@ -55,7 +56,14 @@ public final class ThiltapesSessao {
     }
 
     public void salvarToken(@Nullable String token) {
-        prefs.edit().putString(K_TOKEN, token != null ? token : "").apply();
+        String valor = token != null ? token : "";
+        SharedPreferences.Editor editor = prefs.edit().putString(K_TOKEN, valor);
+        if (valor.isEmpty()) {
+            editor.remove(K_API_BASE_URL_TOKEN);
+        } else {
+            editor.putString(K_API_BASE_URL_TOKEN, ThiltapesUrls.base());
+        }
+        editor.apply();
     }
 
     @NonNull
@@ -65,6 +73,23 @@ public final class ThiltapesSessao {
 
     public boolean temToken() {
         return !obterToken().isEmpty();
+    }
+
+    public void invalidarTokenSeBackendMudou() {
+        if (!temToken()) {
+            return;
+        }
+
+        String apiBaseUrlToken = prefs.getString(K_API_BASE_URL_TOKEN, "");
+        if (ThiltapesUrls.base().equals(apiBaseUrlToken)) {
+            return;
+        }
+
+        prefs.edit()
+                .remove(K_TOKEN)
+                .remove(K_API_BASE_URL_TOKEN)
+                .remove(K_EH_ADMIN)
+                .apply();
     }
 
     /**

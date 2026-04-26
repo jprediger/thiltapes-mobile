@@ -29,6 +29,7 @@ public final class ThiltapesAuthBootstrap {
             @NonNull Runnable aoSucesso,
             @NonNull Response.ErrorListener aoErro) {
         ThiltapesSessao sessao = ThiltapesSessao.de(ctx);
+        sessao.invalidarTokenSeBackendMudou();
         if (sessao.temToken()) {
             aoSucesso.run();
             return;
