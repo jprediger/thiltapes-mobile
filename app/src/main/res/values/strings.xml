@@ -23,6 +23,10 @@
     <string name="adicionar_thiltape">Adicionar thiltape</string>
     <string name="titulo_gerenciar_jogos">Meus jogos</string>
     <string name="msg_inventario_vazio">Nada no inventario ainda.</string>
+    <string name="titulo_thiltapes_nao_coletados">Thiltapes não coletados próximos</string>
+    <string name="legenda_muito_perto">≤ 30 m</string>
+    <string name="legenda_proximo">≤ 200 m</string>
+    <string name="legenda_distante">&gt; 200 m</string>
     <string name="pontuacao_item_format">%1$d pts</string>
     <string name="titulo_thiltape_linha">Thiltape</string>
     <string name="hint_nome_thiltape">Nome</string>

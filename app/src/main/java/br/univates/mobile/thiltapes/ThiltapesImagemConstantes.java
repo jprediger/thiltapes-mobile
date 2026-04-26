@@ -52,4 +52,10 @@ public final class ThiltapesImagemConstantes {
 
     /** Offset vertical (px) entre o pin do marker e a borda inferior do popup de captura. */
     public static final float OFFSET_VERTICAL_POPUP_PX = 48f;
+
+    /** Distância limite (m) para borda verde na lista (muito perto — imagem nítida). */
+    public static final float DISTANCIA_BORDA_PROXIMA_METROS = 30f;
+
+    /** Distância limite (m) para borda âmbar na lista; acima disso borda vermelha. */
+    public static final float DISTANCIA_BORDA_MEDIA_METROS = 200f;
 }

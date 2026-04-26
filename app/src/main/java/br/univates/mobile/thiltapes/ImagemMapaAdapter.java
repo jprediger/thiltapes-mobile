@@ -55,9 +55,15 @@ public final class ImagemMapaAdapter extends RecyclerView.Adapter<ImagemMapaAdap
         ImageView iv = holder.imagem;
         View container = holder.container;
 
-        container.setBackgroundResource(
-                item.isContornoDourado() ? R.drawable.thiltape_outline_dourado : 0
-        );
+        int bordaRes;
+        if (item.getDistanciaMetros() <= ThiltapesImagemConstantes.DISTANCIA_BORDA_PROXIMA_METROS) {
+            bordaRes = R.drawable.thiltape_outline_verde;
+        } else if (item.getDistanciaMetros() <= ThiltapesImagemConstantes.DISTANCIA_BORDA_MEDIA_METROS) {
+            bordaRes = R.drawable.thiltape_outline_ambar;
+        } else {
+            bordaRes = R.drawable.thiltape_outline_vermelho;
+        }
+        container.setBackgroundResource(bordaRes);
 
         Glide.with(holder.itemView).clear(iv);
         iv.setImageDrawable(new ColorDrawable(0xFF333333));
