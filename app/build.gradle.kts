@@ -34,7 +34,7 @@ android {
         val urlEfetiva = if (urlDeclarada.isNotEmpty()) {
             urlDeclarada.trimEnd('/')
         } else {
-            "http://192.168.0.106:3000"
+            "https://skirts-programmes-wage-deposits.trycloudflare.com"
         }
         buildConfigField("String", "API_BASE_URL", "\"$urlEfetiva\"")
         buildConfigField(
