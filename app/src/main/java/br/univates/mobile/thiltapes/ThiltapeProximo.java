@@ -17,12 +17,15 @@ public final class ThiltapeProximo {
     private final boolean desbloqueado;
     /** Contorno dourado no radar para itens desbloqueados; nao usado no inventario. */
     private final boolean contornoDourado;
+    @NonNull
+    private final String nome;
+    private final int pontuacao;
 
     /**
      * Mock ou dados locais sem id de API.
      */
     public ThiltapeProximo(String fonte, boolean ehBase64, float distanciaMetros) {
-        this(-1, fonte, ehBase64, distanciaMetros, false, false);
+        this(-1, fonte, ehBase64, distanciaMetros, false, false, "", 0);
     }
 
     public ThiltapeProximo(
@@ -31,13 +34,17 @@ public final class ThiltapeProximo {
             boolean ehBase64,
             float distanciaMetros,
             boolean desbloqueado,
-            boolean contornoDourado) {
+            boolean contornoDourado,
+            @NonNull String nome,
+            int pontuacao) {
         this.thiltapeId = thiltapeId;
         this.fonte = fonte;
         this.ehBase64 = ehBase64;
         this.distanciaMetros = distanciaMetros;
         this.desbloqueado = desbloqueado;
         this.contornoDourado = contornoDourado;
+        this.nome = nome;
+        this.pontuacao = pontuacao;
     }
 
     public int getThiltapeId() {
@@ -63,6 +70,15 @@ public final class ThiltapeProximo {
 
     public boolean isContornoDourado() {
         return contornoDourado;
+    }
+
+    @NonNull
+    public String getNome() {
+        return nome;
+    }
+
+    public int getPontuacao() {
+        return pontuacao;
     }
 
     /**

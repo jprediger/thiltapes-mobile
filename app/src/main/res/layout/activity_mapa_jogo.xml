@@ -10,6 +10,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Popup de captura: posicionado via translationX/Y a partir do marker no mapa.
+         invisible (nao gone) para participar do measure pass e ja ter width/height na 1a abertura. -->
+    <include
+        android:id="@+id/popup_captura_thiltape"
+        layout="@layout/popup_captura_thiltape"
+        android:layout_width="240dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:visibility="invisible" />
+
     <!-- Altura match_parent: colapsado mostra só o peek; expandido cobre a área útil (sempre visível, nunca oculto). -->
     <LinearLayout
         android:id="@+id/sheet_thiltapes"

@@ -364,6 +364,38 @@ public final class ThiltapesApi {
         enfileirar(ctx, req);
     }
 
+    /**
+     * {@code POST /jogos/:jogoId/thiltapes/:thiltapeId/capturar} com body {@code {lat, lng}}.
+     * Sucesso: 200 com {@code ThiltapeResponse}. Erros relevantes: 422 fora de alcance, 409 ja capturado.
+     */
+    public static void postCapturar(
+            @NonNull Context ctx,
+            int jogoId,
+            int thiltapeId,
+            double lat,
+            double lng,
+            @NonNull Response.Listener<JSONObject> ok,
+            @NonNull Response.ErrorListener err) throws JSONException {
+        JSONObject body = new JSONObject();
+        body.put("lat", lat);
+        body.put("lng", lng);
+        JsonObjectRequest req = new JsonObjectRequest(
+                Request.Method.POST,
+                ThiltapesUrls.caminho("jogos", String.valueOf(jogoId), "thiltapes", String.valueOf(thiltapeId), "capturar"),
+                body,
+                ok,
+                err
+        ) {
+            @Override
+            public Map<String, String> getHeaders() {
+                Map<String, String> h = cabeçalhosAuth(ctx);
+                h.put("Content-Type", "application/json");
+                return h;
+            }
+        };
+        enfileirar(ctx, req);
+    }
+
     public static void getInventario(
             @NonNull Context ctx,
             @Nullable Integer filtroJogoId,

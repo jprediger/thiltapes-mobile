@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.PointF;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -14,6 +15,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -28,7 +31,9 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.android.volley.NetworkResponse;
 import com.android.volley.VolleyError;
+import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
 import org.json.JSONObject;
@@ -43,6 +48,8 @@ import br.univates.mobile.thiltapes.dto.ScanResposta;
 import br.univates.mobile.thiltapes.dto.ThiltapePublico;
 
 import org.maplibre.android.MapLibre;
+import org.maplibre.android.annotations.Marker;
+import org.maplibre.android.annotations.MarkerOptions;
 import org.maplibre.android.geometry.LatLng;
 import org.maplibre.android.location.LocationComponent;
 import org.maplibre.android.location.LocationComponentActivationOptions;
@@ -57,10 +64,13 @@ import org.maplibre.android.style.layers.FillExtrusionLayer;
 import org.maplibre.android.style.layers.PropertyFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -86,8 +96,15 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
     private long ultimaAnaliseMs = 0L;
 
     private int jogoId = -1;
-    /** Thiltapes em qualquer jogo ({@code GET /inventario}): contorno dourado, imagem nitida e fallback de URL. */
-    private final Map<Integer, ThiltapePublico> inventarioGlobalPorId = new HashMap<>();
+    private int raioCapturaMetros = ScanResposta.RAIO_CAPTURA_METROS_DEFAULT;
+    /** Markers ativos no mapa (thiltapes dentro do raio de captura). */
+    private final Map<Integer, Marker> markersCaptura = new HashMap<>();
+    /** Dados do scan associados a cada marker (para preencher o popup ao clicar). */
+    private final Map<Marker, ScanItem> dadosDoMarker = new HashMap<>();
+    /** Ultima lista renderizada no recycler — usada para remover item ao capturar sem aguardar proximo scan. */
+    private List<ThiltapeProximo> ultimaListaProximos = new ArrayList<>();
+    private View popupCaptura;
+    private @Nullable Integer idThiltapePopupAberto;
     private RecyclerView recyclerThiltapes;
     private TextView textoVazio;
     private TextView textoPontuacaoJogo;
@@ -134,20 +151,17 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
         mapView.getMapAsync(this::aoMapaPronto);
 
         configurarPainelThiltapes();
-        carregarIdsInventarioGlobalParaMapa();
+        popupCaptura = findViewById(R.id.popup_captura_thiltape);
+        configurarBotaoCapturar();
     }
 
-    private void carregarIdsInventarioGlobalParaMapa() {
-        ThiltapesApi.getInventario(this, null, array -> {
-            inventarioGlobalPorId.clear();
-            for (InventarioLinha l : InventarioLinha.listFromJsonArrayLegacy(array)) {
-                ThiltapePublico t = l.getThiltape();
-                inventarioGlobalPorId.put(t.getId(), t);
+    private void configurarBotaoCapturar() {
+        Button botao = popupCaptura.findViewById(R.id.btn_capturar_popup);
+        botao.setOnClickListener(v -> {
+            if (idThiltapePopupAberto != null) {
+                capturarThiltape(idThiltapePopupAberto);
             }
-            if (localizacaoAtual != null) {
-                executarAnaliseSePossivel();
-            }
-        }, e -> { /* inventario opcional para contorno */ });
+        });
     }
 
     private void abrirInventarioDoJogo() {
@@ -207,7 +221,27 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
 
         mapLibreMap.setStyle("https://tiles.openfreemap.org/styles/liberty", style -> {
             configurarPredios3d(style);
+            configurarListenersDeMarker(mapLibreMap);
             verificarPedirPermissoes();
+        });
+    }
+
+    private void configurarListenersDeMarker(@NonNull MapLibreMap mapLibreMap) {
+        mapLibreMap.setOnMarkerClickListener(marker -> {
+            ScanItem item = dadosDoMarker.get(marker);
+            if (item != null) {
+                mostrarPopup(item);
+            }
+            return true; // suprime InfoWindow padrao
+        });
+        mapLibreMap.addOnMapClickListener(point -> {
+            fecharPopup();
+            return false;
+        });
+        mapLibreMap.addOnCameraMoveListener(() -> {
+            if (idThiltapePopupAberto != null) {
+                atualizarPosicaoPopup();
+            }
         });
     }
 
@@ -310,51 +344,200 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
             Log.w(TAG, "parse scan", e);
             return;
         }
-        Map<Integer, ThiltapePublico> publicoPorId = new HashMap<>();
-        List<Integer> idsNovosDesbloqueio = new ArrayList<>();
-        for (ScanItem item : r.getCapturados()) {
-            ThiltapePublico t = item.getThiltape();
-            publicoPorId.put(t.getId(), t);
-            idsNovosDesbloqueio.add(t.getId());
-        }
-        ThiltapesDesbloqueioPrefs.adicionarVarios(this, jogoId, idsNovosDesbloqueio);
 
-        Map<Integer, Float> distPorId = new HashMap<>();
+        raioCapturaMetros = r.getRaioCapturaMetros();
+        sincronizarMarkers(r.getProximos());
+
+        List<ThiltapeProximo> lista = new ArrayList<>(r.getProximos().size() + r.getCapturados().size());
         for (ScanItem p : r.getProximos()) {
             ThiltapePublico t = p.getThiltape();
-            publicoPorId.putIfAbsent(t.getId(), t);
-            distPorId.put(t.getId(), (float) p.getDistanciaMetros());
-        }
-
-        Set<Integer> desbloqueados = ThiltapesDesbloqueioPrefs.obterIds(this, jogoId);
-        Set<Integer> uniao = new HashSet<>(desbloqueados);
-        uniao.addAll(distPorId.keySet());
-
-        List<ThiltapeProximo> lista = new ArrayList<>();
-        for (int id : uniao) {
-            float d = distPorId.containsKey(id)
-                    ? distPorId.get(id)
-                    : ThiltapesImagemConstantes.DISTANCIA_METROS_PIXELIZACAO_MAXIMA;
-            boolean desbloqueadoVisual = desbloqueados.contains(id) || inventarioGlobalPorId.containsKey(id);
-            ThiltapePublico publico = publicoPorId.get(id);
-            if (publico == null) {
-                publico = inventarioGlobalPorId.get(id);
-            }
-            String url = (publico != null) ? ThiltapesUrls.urlImagemAbsoluta(publico.getImagemUrl()) : "";
+            String url = ThiltapesUrls.urlImagemAbsoluta(t.getImagemUrl());
             lista.add(new ThiltapeProximo(
-                    id,
+                    t.getId(),
                     url,
                     false,
-                    d,
-                    desbloqueadoVisual,
-                    desbloqueadoVisual
+                    (float) p.getDistanciaMetros(),
+                    false,
+                    false,
+                    t.getNome(),
+                    t.getPontuacao()
             ));
         }
-
-        atualizarListaRecycler(lista);
-        if (!idsNovosDesbloqueio.isEmpty()) {
-            carregarPontuacaoJogo();
+        for (ScanItem c : r.getCapturados()) {
+            ThiltapePublico t = c.getThiltape();
+            String url = ThiltapesUrls.urlImagemAbsoluta(t.getImagemUrl());
+            lista.add(new ThiltapeProximo(
+                    t.getId(),
+                    url,
+                    false,
+                    0f,
+                    true,
+                    true,
+                    t.getNome(),
+                    t.getPontuacao()
+            ));
         }
+        ultimaListaProximos = lista;
+        atualizarListaRecycler(lista);
+    }
+
+    /**
+     * Mantem em {@link #markersCaptura} apenas os thiltapes dentro do raio de captura informados pelo scan
+     * mais recente: adiciona os novos, remove os que sairam.
+     */
+    private void sincronizarMarkers(@NonNull List<ScanItem> proximos) {
+        if (map == null) {
+            return;
+        }
+        Set<Integer> idsAgora = new HashSet<>();
+        for (ScanItem p : proximos) {
+            if (p.getDistanciaMetros() <= raioCapturaMetros) {
+                int id = p.getThiltape().getId();
+                idsAgora.add(id);
+                if (!markersCaptura.containsKey(id)) {
+                    adicionarMarker(p);
+                }
+            }
+        }
+        Iterator<Map.Entry<Integer, Marker>> it = markersCaptura.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<Integer, Marker> entry = it.next();
+            if (!idsAgora.contains(entry.getKey())) {
+                Marker marker = entry.getValue();
+                if (Objects.equals(idThiltapePopupAberto, entry.getKey())) {
+                    fecharPopup();
+                }
+                map.removeMarker(marker);
+                dadosDoMarker.remove(marker);
+                it.remove();
+            }
+        }
+    }
+
+    private void adicionarMarker(@NonNull ScanItem item) {
+        if (map == null) {
+            return;
+        }
+        ThiltapePublico t = item.getThiltape();
+        Marker marker = map.addMarker(new MarkerOptions()
+                .position(new LatLng(t.getLat(), t.getLng()))
+                .title(t.getNome()));
+        markersCaptura.put(t.getId(), marker);
+        dadosDoMarker.put(marker, item);
+    }
+
+    private void mostrarPopup(@NonNull ScanItem item) {
+        ThiltapePublico t = item.getThiltape();
+        idThiltapePopupAberto = t.getId();
+
+        TextView nome = popupCaptura.findViewById(R.id.nome_popup_thiltape);
+        ImageView imagem = popupCaptura.findViewById(R.id.imagem_popup_thiltape);
+        Button botao = popupCaptura.findViewById(R.id.btn_capturar_popup);
+
+        nome.setText(t.getNome());
+        Glide.with(this)
+                .load(ThiltapesUrls.urlImagemAbsoluta(t.getImagemUrl()))
+                .into(imagem);
+        botao.setEnabled(true);
+
+        popupCaptura.setVisibility(View.VISIBLE);
+        atualizarPosicaoPopup();
+    }
+
+    private void atualizarPosicaoPopup() {
+        if (map == null || idThiltapePopupAberto == null) {
+            return;
+        }
+        Marker marker = markersCaptura.get(idThiltapePopupAberto);
+        if (marker == null) {
+            return;
+        }
+        PointF tela = map.getProjection().toScreenLocation(marker.getPosition());
+        Runnable aplicar = () -> {
+            popupCaptura.setTranslationX(tela.x - popupCaptura.getWidth() / 2f);
+            popupCaptura.setTranslationY(tela.y - popupCaptura.getHeight()
+                    - ThiltapesImagemConstantes.OFFSET_VERTICAL_POPUP_PX);
+        };
+        if (popupCaptura.getWidth() == 0 || popupCaptura.getHeight() == 0) {
+            popupCaptura.post(aplicar);
+        } else {
+            aplicar.run();
+        }
+    }
+
+    private void fecharPopup() {
+        if (idThiltapePopupAberto == null) {
+            return;
+        }
+        idThiltapePopupAberto = null;
+        popupCaptura.setVisibility(View.INVISIBLE);
+        Button botao = popupCaptura.findViewById(R.id.btn_capturar_popup);
+        botao.setEnabled(true);
+    }
+
+    private void capturarThiltape(int thiltapeId) {
+        if (localizacaoAtual == null) {
+            return;
+        }
+        Button botao = popupCaptura.findViewById(R.id.btn_capturar_popup);
+        botao.setEnabled(false);
+        try {
+            ThiltapesApi.postCapturar(
+                    this,
+                    jogoId,
+                    thiltapeId,
+                    localizacaoAtual.getLatitude(),
+                    localizacaoAtual.getLongitude(),
+                    corpo -> aoCapturarSucesso(thiltapeId),
+                    this::aoErroCaptura);
+        } catch (org.json.JSONException e) {
+            Log.w(TAG, "captura: build body", e);
+            botao.setEnabled(true);
+        }
+    }
+
+    private void aoCapturarSucesso(int thiltapeId) {
+        fecharPopup();
+
+        Marker marker = markersCaptura.remove(thiltapeId);
+        if (marker != null) {
+            dadosDoMarker.remove(marker);
+            if (map != null) {
+                map.removeMarker(marker);
+            }
+        }
+
+        ThiltapesDesbloqueioPrefs.adicionarVarios(this, jogoId,
+                Collections.singletonList(thiltapeId));
+
+        List<ThiltapeProximo> filtrada = new ArrayList<>(ultimaListaProximos.size());
+        for (ThiltapeProximo p : ultimaListaProximos) {
+            if (p.getThiltapeId() != thiltapeId) {
+                filtrada.add(p);
+            }
+        }
+        ultimaListaProximos = filtrada;
+        atualizarListaRecycler(filtrada);
+
+        carregarPontuacaoJogo();
+    }
+
+    private void aoErroCaptura(@NonNull VolleyError e) {
+        Button botao = popupCaptura.findViewById(R.id.btn_capturar_popup);
+        botao.setEnabled(true);
+
+        NetworkResponse resp = e.networkResponse;
+        int statusCode = (resp != null) ? resp.statusCode : -1;
+        int mensagemId;
+        if (statusCode == 422) {
+            mensagemId = R.string.msg_captura_fora_de_alcance;
+        } else if (statusCode == 409) {
+            mensagemId = R.string.msg_captura_ja_coletado;
+        } else {
+            mensagemId = R.string.msg_captura_falhou;
+        }
+        Toast.makeText(this, mensagemId, Toast.LENGTH_SHORT).show();
+        Log.w(TAG, "captura erro status=" + statusCode + ": " + e);
     }
 
     /**
@@ -482,6 +665,8 @@ public class MapaJogoActivity extends AppCompatActivity implements LocationListe
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        markersCaptura.clear();
+        dadosDoMarker.clear();
         ThiltapesCacheBitmapLru.limpar();
         mapView.onDestroy();
     }

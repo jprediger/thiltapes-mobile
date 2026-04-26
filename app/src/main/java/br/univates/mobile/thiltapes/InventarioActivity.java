@@ -8,6 +8,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.card.MaterialCardView;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -69,7 +71,9 @@ public class InventarioActivity extends AppCompatActivity {
                     false,
                     0f,
                     true,
-                    false
+                    false,
+                    t.getNome(),
+                    t.getPontuacao()
             ));
         }
 
@@ -103,14 +107,16 @@ public class InventarioActivity extends AppCompatActivity {
         @Override
         public HolderMini onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View v = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_imagem_mapa, parent, false);
+                    .inflate(R.layout.item_inventario, parent, false);
             return new HolderMini(v);
         }
 
         @Override
         public void onBindViewHolder(@NonNull HolderMini h, int position) {
             ThiltapeProximo item = itens.get(position);
-            h.container.setBackgroundResource(0);
+            h.nome.setText(item.getNome());
+            h.pontuacao.setText(
+                    activity.getString(R.string.pontuacao_item_format, item.getPontuacao()));
             ImagemMapaAdapter.carregarMiniaturaPublica(
                     h.itemView,
                     h.imagem,
@@ -118,7 +124,7 @@ public class InventarioActivity extends AppCompatActivity {
                     position,
                     item.chaveCacheLista(position)
             );
-            h.imagem.setOnClickListener(v ->
+            h.card.setOnClickListener(v ->
                     ThiltapeFullscreenDialog.mostrar(activity, item, position)
             );
         }
@@ -129,13 +135,17 @@ public class InventarioActivity extends AppCompatActivity {
         }
 
         static final class HolderMini extends RecyclerView.ViewHolder {
+            final MaterialCardView card;
             final ImageView imagem;
-            final View container;
+            final TextView nome;
+            final TextView pontuacao;
 
             HolderMini(@NonNull View itemView) {
                 super(itemView);
-                imagem = itemView.findViewById(R.id.imagem_miniatura);
-                container = itemView.findViewById(R.id.container_miniatura_thiltape);
+                card = itemView.findViewById(R.id.card_inventario);
+                imagem = itemView.findViewById(R.id.imagem_inventario);
+                nome = itemView.findViewById(R.id.nome_inventario);
+                pontuacao = itemView.findViewById(R.id.pontuacao_inventario);
             }
         }
     }

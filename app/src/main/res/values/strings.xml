@@ -23,6 +23,7 @@
     <string name="adicionar_thiltape">Adicionar thiltape</string>
     <string name="titulo_gerenciar_jogos">Meus jogos</string>
     <string name="msg_inventario_vazio">Nada no inventario ainda.</string>
+    <string name="pontuacao_item_format">%1$d pts</string>
     <string name="titulo_thiltape_linha">Thiltape</string>
     <string name="hint_nome_thiltape">Nome</string>
     <string name="hint_pontos">Pontuacao</string>
@@ -37,5 +38,9 @@
     <string name="msg_thiltape_incompleto">Preencha nome, pontos, coordenadas e foto nos thiltapes novos.</string>
     <string name="msg_sem_gps">Nao foi possivel obter a ultima posicao; tente de novo ao ar livre.</string>
     <string name="msg_jogo_invalido">Selecione um jogo valido na lista.</string>
+    <string name="btn_capturar_thiltape">Capturar</string>
+    <string name="msg_captura_fora_de_alcance">Fora de alcance</string>
+    <string name="msg_captura_ja_coletado">Ja coletado</string>
+    <string name="msg_captura_falhou">Falha ao capturar.</string>
 </resources>
 

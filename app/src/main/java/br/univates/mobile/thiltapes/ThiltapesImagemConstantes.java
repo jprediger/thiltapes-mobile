@@ -49,4 +49,7 @@ public final class ThiltapesImagemConstantes {
      * @see <a href="https://bumptech.github.io/glide/doc/resizing.html">Glide - Resizing</a>
      */
     public static final int CARREGAMENTO_THILTAPE_LADO_PX = 512;
+
+    /** Offset vertical (px) entre o pin do marker e a borda inferior do popup de captura. */
+    public static final float OFFSET_VERTICAL_POPUP_PX = 48f;
 }

@@ -15,14 +15,22 @@ import java.util.Optional;
  */
 public final class ScanResposta {
 
+    /** Default usado quando o servidor nao envia {@code raio_captura_metros} (clientes antigos / fallback). */
+    public static final int RAIO_CAPTURA_METROS_DEFAULT = 15;
+
     @NonNull
     private final List<ScanItem> proximos;
     @NonNull
     private final List<ScanItem> capturados;
+    private final int raioCapturaMetros;
 
-    public ScanResposta(@NonNull List<ScanItem> proximos, @NonNull List<ScanItem> capturados) {
+    public ScanResposta(
+            @NonNull List<ScanItem> proximos,
+            @NonNull List<ScanItem> capturados,
+            int raioCapturaMetros) {
         this.proximos = proximos;
         this.capturados = capturados;
+        this.raioCapturaMetros = raioCapturaMetros;
     }
 
     @NonNull
@@ -32,7 +40,8 @@ public final class ScanResposta {
         }
         return Optional.of(new ScanResposta(
                 ScanItem.listFromJsonArray(obterArrayOuVazio(json, "proximos")),
-                ScanItem.listFromJsonArray(obterArrayOuVazio(json, "capturados"))
+                ScanItem.listFromJsonArray(obterArrayOuVazio(json, "capturados")),
+                obterIntOuPadrao(json, "raio_captura_metros", RAIO_CAPTURA_METROS_DEFAULT)
         ));
     }
 
@@ -44,6 +53,17 @@ public final class ScanResposta {
         return json.getAsJsonArray(chave);
     }
 
+    private static int obterIntOuPadrao(@NonNull JsonObject json, @NonNull String chave, int padrao) {
+        if (!json.has(chave) || json.get(chave).isJsonNull()) {
+            return padrao;
+        }
+        try {
+            return json.get(chave).getAsInt();
+        } catch (RuntimeException ignored) {
+            return padrao;
+        }
+    }
+
     @NonNull
     public List<ScanItem> getProximos() {
         return Collections.unmodifiableList(proximos);
@@ -52,5 +72,9 @@ public final class ScanResposta {
     @NonNull
     public List<ScanItem> getCapturados() {
         return Collections.unmodifiableList(capturados);
+    }
+
+    public int getRaioCapturaMetros() {
+        return raioCapturaMetros;
     }
 }
